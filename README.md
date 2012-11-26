@@ -13,14 +13,14 @@ signal ← {¯50⌈50⌊50×(diff 0,⍵)÷0.01+⍵}
 
 compiles into the following abstract syntax tree (pretty printed):
 
-    [Assign(diff,Lam(App2(Drop,1,App2(Sub,Omega,App2(Rot,~1,Omega))))),
-     Assign(signal,Lam(App2(Max,~50,
-			 App2(Min,50,
-			   App2(Times,50,
-			     App1(diff,
-			       App2(Cat,0,
-				 App2(Div,Omega,
-				   App2(Add,0.01,Omega)))))))))
+    [Assign(diff,Lam(App2(Drop,1,App2(Sub,Omega,App2(Rot,-1,Omega))))),
+     Assign(signal,Lam(App2(Max,-50,
+                         App2(Min,50,
+                           App2(Times,50,
+                             App1(diff,
+                               App2(Cat,0,
+                                 App2(Div,Omega,
+                                   App2(Add,0.01,Omega)))))))))
     ]
 
 ## Try it!

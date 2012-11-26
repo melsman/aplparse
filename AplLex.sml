@@ -51,14 +51,6 @@ datatype token =
        | Int of string
        | Double of string
 
-local
-  fun repair s =
-      String.translate (fn #"~" => "-" | c => String.str c) s
-in
-fun pr_real r = repair r
-fun pr_int i = repair i
-end
-
 fun pr_token t =
     case t of
          Alpha => "Alpha"
@@ -229,7 +221,7 @@ fun process0 (w,(tokens,state)) =
             case (state, elem) of
               (CommentS,      SOME Newline)      => (tokens, StartS)
             | (CommentS,      _           )      => (tokens, state)
-            | (StartS,        SOME Macron)       => (tokens, IntS "~")
+            | (StartS,        SOME Macron)       => (tokens, IntS "-")
             | (StartS,        SOME (Digit c))    => (tokens, IntS(String.str c))
             | (IntS s,        SOME (Digit c))    => (tokens, IntS(s ^ String.str c))
             | (DoubleS s,     SOME (Digit c))    => (tokens, DoubleS(s ^ String.str c))

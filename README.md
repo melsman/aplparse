@@ -36,7 +36,7 @@ means that you need to checkout the
 [smlunicode](https://github.com/melsman/smlunicode) sources in a
 folder besides the aplparse sources.
 
-You also need a Standard ML compiler (e.g., mlton).
+You also need a Standard ML compiler (e.g., [Mlton](http://www.mlton.org/)).
 
 Then simply write `make test` followed by `./test` in your shell.
 

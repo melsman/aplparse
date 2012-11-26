@@ -1,0 +1,9 @@
+local
+   $(SML_LIB)/basis/basis.mlb
+   ../smlunicode/unicode.mlb
+in
+   PARSE_COMB.sig
+   ParseComb.sml
+   AplLex.sml
+   AplParse.sml
+end

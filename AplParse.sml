@@ -1,6 +1,6 @@
 structure AplParse = struct
 
-val p_debug = false
+val p_debug = true
 fun debug f =
     if p_debug then print(f())
     else ()
@@ -21,13 +21,14 @@ datatype exp =
        | LambE of exp
        | App0E of id                  (* apply niladic function *)
        | App1E of id * exp            (* apply monadic function *)
-       | App2E of id * exp * exp     (* apply dyadic function *) 
+       | App2E of id * exp * exp      (* apply dyadic function *) 
        | AssignE of var * exp
        | SeqE of exp list
        | GuardE of exp * exp
        | IndexE of exp * exp option list
        | UnresE of exp list
        | SymbE of token
+       | ParE of exp
 
 fun pr_id (Var v) = v
   | pr_id (Symb s) = L.pr_token s
@@ -45,6 +46,7 @@ fun pr_exp e =
     | App2E (id,e1,e2) => "App2(" ^ pr_id id ^ "," ^ pr_exp e1 ^ "," ^ pr_exp e2 ^ ")"
     | AssignE (v,e) => "Assign(" ^ v ^ "," ^ pr_exp e ^ ")"
     | SeqE es => "[" ^ pr_exps es ^ "]"
+    | ParE e => "Par(" ^ pr_exp e ^ ")"
     | GuardE (e1,e2) => "Guard(" ^ pr_exp e1 ^ "," ^ pr_exp e2 ^ ")"
     | IndexE (e,is) => "Index(" ^ pr_exp e ^ "," ^ pr_indices is ^ ")"
     | SymbE t => L.pr_token t
@@ -149,7 +151,7 @@ fun p_symb nil = NONE
    indices ::= expr < ; indices >
              | ; indices
 
-   indexable ::= INTEGER | DOUBLE | STRING | SYMBOL
+   indexable ::= INTEGER | DOUBLE | STRING | SYMBOL 
                | ( expr ) | { body }
 *)
 
@@ -193,7 +195,7 @@ and p_indexable ts =
     || (p_double oo DoubleE)
     || (p_symb oo SymbE)
     || (p_id oo VarE)
-    || (eat L.Lpar ->> p_expr >>- eat L.Rpar)
+    || ((eat L.Lpar ->> p_expr >>- eat L.Rpar) oo ParE)
     || ((eat L.Lbra ->> p_expr >>- eat L.Rbra) oo LambE)
     ) ts
 
@@ -260,6 +262,10 @@ fun resolve E e =
                         in (e::es,E2@E0)
                         end) (nil,emp) es
       in (SeqE (rev es),E)
+      end
+    | ParE e => 
+      let val (e,E) = resolve E e
+      in (e, E)
       end
     | GuardE (e1,e2) =>
       let val (e1,E1) = resolve E e1

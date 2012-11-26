@@ -17,10 +17,15 @@ compiles into the following abstract syntax tree (pretty printed):
      Assign(signal,Lam(App2(Max,-50,
                          App2(Min,50,
                            App2(Times,50,
-                             App1(diff,
-                               App2(Cat,0,
-                                 App2(Div,Omega,
-                                   App2(Add,0.01,Omega)))))))))
+                             App2(Div,
+                               App1(diff,App2(Cat,0,Omega)),
+                               App2(Add,0.01,Omega)
+                             )
+                           )
+                         )
+                       )
+                      )
+           )
     ]
 
 ## Try it!

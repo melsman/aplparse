@@ -25,9 +25,11 @@ compiles into the following abstract syntax tree (pretty printed):
 
 ## Try it!
 
-The software makes use of the smlunicode library for lexing, which
-means that you need to checkout the smlunicode sources in a folder
-besides the aplparse sources.
+The software makes use of the [smlunicode
+library](https://github.com/melsman/smlunicode) for lexing, which
+means that you need to checkout the
+[smlunicode](https://github.com/melsman/smlunicode) sources in a
+folder besides the aplparse sources.
 
 You also need a Standard ML compiler (e.g., mlton).
 

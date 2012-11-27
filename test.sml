@@ -5,7 +5,7 @@ fun rFile f =
        s
     end
 
-val c = rFile "apl_test.txt"
+val c = rFile "test.apl"
 
 val ts = AplLex.lex c
 

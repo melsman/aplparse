@@ -1,65 +1,11 @@
-structure AplParse = struct
+structure AplParse : APL_PARSE = struct
 
 val p_debug = true
 fun debug f =
     if p_debug then print(f())
     else ()
 
-structure L = AplLex
-type token = L.token
-type var = string
-
-datatype id = Symb of token
-            | Var of var
-
-datatype exp =
-         IntE of string
-       | DoubleE of string
-       | StrE of string
-       | VecE of exp list
-       | VarE of var
-       | LambE of exp
-       | App0E of id                  (* apply niladic function *)
-       | App1E of id * exp            (* apply monadic function *)
-       | App2E of id * exp * exp      (* apply dyadic function *) 
-       | AssignE of var * exp
-       | SeqE of exp list
-       | GuardE of exp * exp
-       | IndexE of exp * exp option list
-       | UnresE of exp list
-       | SymbE of token
-       | ParE of exp
-
-fun pr_id (Var v) = v
-  | pr_id (Symb s) = L.pr_token s
-
-fun pr_exp e =
-    case e of
-      IntE s => s
-    | DoubleE s => s
-    | StrE s => "\"" ^ String.toString s ^ "\""
-    | VecE es => "Vec[" ^ pr_exps es ^ "]"
-    | VarE s => s
-    | LambE e => "Lam(" ^ pr_exp e ^ ")"
-    | App0E id => "App0(" ^ pr_id id ^ ")"
-    | App1E (id,e) => "App1(" ^ pr_id id ^ "," ^ pr_exp e ^ ")"
-    | App2E (id,e1,e2) => "App2(" ^ pr_id id ^ "," ^ pr_exp e1 ^ "," ^ pr_exp e2 ^ ")"
-    | AssignE (v,e) => "Assign(" ^ v ^ "," ^ pr_exp e ^ ")"
-    | SeqE es => "[" ^ pr_exps es ^ "]"
-    | ParE e => "Par(" ^ pr_exp e ^ ")"
-    | GuardE (e1,e2) => "Guard(" ^ pr_exp e1 ^ "," ^ pr_exp e2 ^ ")"
-    | IndexE (e,is) => "Index(" ^ pr_exp e ^ "," ^ pr_indices is ^ ")"
-    | SymbE t => L.pr_token t
-    | UnresE es => "Unres[" ^ pr_exps es ^ "]"
-
-and pr_exps nil = ""
-  | pr_exps [e] = pr_exp e
-  | pr_exps (e::es) = pr_exp e ^ "," ^ pr_exps es
-
-and pr_indices nil = ""
-  | pr_indices (NONE::is) = "; " ^ pr_indices is
-  | pr_indices (SOME e :: is) = pr_exp e ^ pr_indices is
-
+open AplAst
 structure PComb = ParseComb(type token=token)
 
 open PComb infix >>> ->> >>- ?? || oo
@@ -193,8 +139,8 @@ and p_indices ts =
 and p_indexable ts =
     (  (p_int oo IntE)
     || (p_double oo DoubleE)
-    || (p_symb oo SymbE)
-    || (p_id oo VarE)
+    || (p_symb oo (IdE o Symb))
+    || (p_id oo (IdE o Var))
     || ((eat L.Lpar ->> p_expr >>- eat L.Rpar) oo ParE)
     || ((eat L.Lbra ->> p_expr >>- eat L.Rbra) oo LambE)
     ) ts
@@ -231,13 +177,14 @@ fun resolve_vectors es =
 
 type env = (id * int) list
 val emp = []
+fun plus(e,e') = e'@e
+fun pr_env e = 
+    "{" ^ 
+    String.concatWith "," (List.map (fn (id,i) => (AplAst.pr_id id ^ ":" ^ Int.toString i)) e)
+    ^ "}"
 
 fun isFunKind i E id =
     List.exists (fn p => p = (id,i)) E
-
-fun idOfExp (SymbE t) = SOME(Symb t)
-  | idOfExp (VarE v) = SOME(Var v)
-  | idOfExp _ = NONE
 
 fun resolve E e =
     case e of
@@ -245,11 +192,11 @@ fun resolve E e =
     | DoubleE s => (e,emp)
     | VecE _ => (e,emp)
     | StrE s => (e,emp)
-    | VarE s => (e,emp)
+    | IdE s => (e,emp)
     | LambE e => (LambE (#1(resolve E e)), emp)
-    | App0E id => raise Fail "resolve:App0"
-    | App1E (id,e) => raise Fail "resolve:App1"
-    | App2E (id,e1,e2) => raise Fail "resolve:App1"
+    | App0E e0 => raise Fail "resolve:App0"
+    | App1E (e0,e) => raise Fail "resolve:App1"
+    | App2E (e0,e1,e2) => raise Fail "resolve:App1"
     | AssignE (v,e) =>
       let val (e,E) = resolve E e
       in (AssignE(v,e),[(Var v,1)])  (* MEMO: support other kinds of variables *)
@@ -282,52 +229,68 @@ fun resolve E e =
           val (e0,E0) = resolve (E1@E) e0
       in (IndexE(e0,rev is),E0@E1)
       end
-    | SymbE t => (e,emp)
     | UnresE es =>
       let val es = resolve_vectors es
       in res E es
       end
-and resolveFun i E e =
-    case idOfExp e of
-      SOME id => if isFunKind i E id then SOME id
-                 else NONE
-    | NONE => NONE
-and resolveDyadic E e = resolveFun 2 E e
-and resolveMonadic E e = resolveFun 1 E e
-and resolveNiladic E e = resolveFun 0 E e
+    | Opr1E _ => raise Fail "resolve.Opr1E"
+    | Opr2E _ => raise Fail "resolve.Opr2E"
+and resolveFunOpr i E e =
+    case e of
+      IdE id => if isFunKind i E id then SOME e
+                else NONE
+    | LambE e1 => SOME (LambE(#1(resolve E e1)))
+    | _ => NONE
+and resolveDyadicFun E e = resolveFunOpr 2 E e
+and resolveDyadicOpr E e = resolveFunOpr ~2 E e
+and resolveMonadicFun E e = resolveFunOpr 1 E e
+and resolveMonadicOpr E e = resolveFunOpr ~1 E e
+and resolveNiladicFun E e = resolveFunOpr 0 E e
 and isArg E e =
-    (case (resolveDyadic E e, resolveMonadic E e, resolveNiladic E e) of
+    (case (resolveDyadicFun E e, resolveMonadicFun E e, resolveNiladicFun E e) of
        (NONE, NONE, NONE) => true
      | _ =>  false)
 and res0 E (e,(es,E')) =
     case es of
-      [] => (case resolveNiladic (E'@E) e of
-               SOME id => ([App0E id],emp)
+      [] => (case resolveNiladicFun (E'@E) e of
+               SOME f => ([App0E f],emp)
              | NONE =>
                let val (e,E'') = resolve (E'@E) e
                in ([e],E''@E')
                end)
     | [e1,e2] =>
       let fun monadic s =
-              case resolveMonadic (E'@E) e1 of  (* check if e1 is also monadic *)
-                SOME id => res0 E (e,([App1E(id,e2)],E'))
-              | NONE => raise Fail ("expecting either dyadic or monadic operator: " ^ s)
-      in case resolveDyadic (E'@E) e1 of
-           SOME id =>
+              case resolveMonadicFun (E'@E) e1 of  (* check if e1 is also monadic *)
+                SOME f => res0 E (e,([App1E(f,e2)],E'))
+              | NONE => raise Fail ("expecting either dyadic or monadic function: " ^ s)
+      in case resolveMonadicOpr (E'@E) e1 of
+           SOME (IdE(Symb opr)) =>
+           (case resolveDyadicFun (E'@E) e of
+              SOME f => ([App1E(Opr1E(opr,f),e2)],E')
+            | NONE => raise Fail ("resolve.expecting dyadic function: " ^ pr_exp e))
+         | _ =>
+         case resolveDyadicFun (E'@E) e1 of
+           SOME f =>
            if isArg (E'@E) e then
              let val (e,E'') = resolve (E'@E) e
-             in ([App2E(id,e,e2)],E''@E')
+             in ([App2E(f,e,e2)],E''@E')
              end
            else monadic "1"
          | NONE => monadic "2"
       end
     | [e1] =>
-      (case resolveDyadic (E'@E) e of
-         SOME _ => ([e,e1],E')
-       | NONE =>
-         case resolveMonadic (E'@E) e of
-           SOME id => ([App1E(id,e1)],E')
-         | NONE => raise Fail ("expecting either dyadic or monadic operator: - got: " ^ pr_exp e ^ "; e1 is " ^ pr_exp e1))
+      let val E'' = E'@E
+      in case resolveDyadicFun E'' e of
+           SOME _ => ([e,e1],E')
+         | NONE =>
+           case resolveMonadicOpr E'' e of
+             SOME _ => ([e,e1],E')
+           | NONE =>
+           case resolveMonadicFun E'' e of
+             SOME f => ([App1E(f,e1)],E')
+           | NONE => raise Fail ("expecting either dyadic or monadic function - got: " 
+                                 ^ pr_exp e ^ "; e1 is " ^ pr_exp e1 ^ "; E''= " ^ pr_env E'')
+      end
     | _ => raise Fail "res0: impossible"
     
 and res E es =
@@ -338,33 +301,34 @@ and res E es =
        | _ => raise Fail "resolvation failed"
     end
 
-val monadic =
-    let open L 
-    in [Rho, Iota, Max, Min, Enclose, Disclose, Gradeup, Gradedown, Add, Sub, Cat, 
-        Trans, Rot, Vrot]
-    end
+local open L
+in
+val monadicFun =
+    [Rho, Iota, Max, Min, Enclose, Disclose, Gradeup, Gradedown, Add, Sub, Cat, 
+     Trans, Rot, Vrot]
+    
+val dyadicFun =
+    [Rho, Max, Min, Each, Add, Sub, Times, Div, Pow, Cat, Vcat, Rot, Vrot, Lt, Gt, 
+     Lteq, Gteq, Eq, Neq, Take, Drop, Or, And, Match, Nmatch, Intersect, Union]
 
-val dyadic =
-    let open L 
-    in [Rho, Max, Min, Each, Add, Sub, Times, Div, Pow, Cat, Vcat, Rot, Vrot, Lt, Gt, 
-        Lteq, Gteq, Eq, Neq, Take, Drop, Or, And, Match, Nmatch, Intersect, Union]
-    end
+val niladicFun = [Qmark]
 
-val niladic =
-    let open L 
-    in [Qmark]
-    end
+val monadicOpr = [Slash]
+val dyadicOpr = [Dot]
+end
 
 val env0 =
-    map (fn t => (Symb t,1)) monadic @
-    map (fn t => (Symb t,2)) dyadic @
-    map (fn t => (Symb t,0)) niladic
+    map (fn t => (Symb t,1)) monadicFun @
+    map (fn t => (Symb t,2)) dyadicFun @
+    map (fn t => (Symb t,0)) niladicFun @
+    map (fn t => (Symb t,~1)) monadicOpr @
+    map (fn t => (Symb t,~2)) dyadicOpr
 
-fun parse ts =
+fun parse env ts =
     case parse0 ts of
       SOME e =>
       let val () = debug (fn () => "AST is\n " ^ pr_exp e ^ "\n")
-      in SOME(#1 (resolve env0 e))
+      in SOME(resolve env e)
       end
     | NONE => NONE
 end

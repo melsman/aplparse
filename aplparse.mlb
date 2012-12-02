@@ -5,5 +5,7 @@ in
    PARSE_COMB.sig
    ParseComb.sml
    AplLex.sml
+   AplAst.sml
+   APL_PARSE.sig
    AplParse.sml
 end

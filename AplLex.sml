@@ -120,7 +120,7 @@ fun pr_token t =
        | Newline => "Newline"
        | Letter c => "Letter(" ^ String.str c ^ ")"
        | Digit c => "Digit(" ^ String.str c ^ ")"
-       | Id s => s
+       | Id s => "Id(" ^ s ^ ")"
        | Int i => i
        | Double r => r
 

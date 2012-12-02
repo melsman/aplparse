@@ -44,6 +44,6 @@ Then simply write `make test` followed by `./test` in your shell.
 
 Todo: Operators and improved error handling.
 
-## LICENSE
+## License
 
 This software is published under the [MIT License](MIT_LICENSE.md).

@@ -199,7 +199,9 @@ fun resolve E e =
     | App2E (e0,e1,e2) => raise Fail "resolve:App1"
     | AssignE (v,e) =>
       let val (e,E) = resolve E e
-      in (AssignE(v,e),[(Var v,1)])  (* MEMO: support other kinds of variables *)
+      in (AssignE(v,e),[(Var v,1)])  (* MEMO: support other kinds of variables; by looking at e we
+                                      * should be able to determine if v is an operator or a function
+                                      * and whether it is monadic or dyadic... *)
       end
     | SeqE es => 
       let val (es,E) =
@@ -239,6 +241,7 @@ and resolveFunOpr i E e =
     case e of
       IdE id => if isFunKind i E id then SOME e
                 else NONE
+    | ParE e => resolveFunOpr i E e
     | LambE e1 => SOME (LambE(#1(resolve E e1)))
     | _ => NONE
 and resolveDyadicFun E e = resolveFunOpr 2 E e

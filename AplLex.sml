@@ -2,8 +2,10 @@ structure AplLex = struct
 
 datatype token =
          Alpha
-       | Iota
        | Omega
+       | Alphaalpha
+       | Omegaomega
+       | Iota
        | Rho
        | Quad
        | Quaddiv
@@ -54,8 +56,10 @@ datatype token =
 fun pr_token t =
     case t of
          Alpha => "Alpha"
-       | Iota => "Iota"
        | Omega => "Omega"
+       | Alphaalpha => "Alphaalpha"
+       | Omegaomega => "Omegaomega"
+       | Iota => "Iota"
        | Rho => "Rho"
        | Quad => "Quad"
        | Quaddiv => "Quaddiv"
@@ -126,6 +130,7 @@ fun pr_token t =
 
 datatype state = CommentS
                | StartS
+               | SymbS of token   (* for lexing Alphaalpha and Omegaomega *)
                | IntS of string
                | DoubleS of string
                | IdS of string
@@ -231,6 +236,11 @@ fun process0 (w,(tokens,state)) =
             | (StartS,        SOME (Letter c))   => (tokens, IdS(String.str c))
             | (IdS s,         SOME (Letter c))   => (tokens, IdS(s ^ String.str c))
             | (IdS s,         SOME (Digit c))    => (tokens, IdS(s ^ String.str c))
+            | (StartS,        SOME Alpha)        => (tokens, SymbS Alpha)
+            | (StartS,        SOME Omega)        => (tokens, SymbS Omega)
+            | (SymbS Alpha,   SOME Alpha)        => (Alphaalpha::tokens, StartS)
+            | (SymbS Omega,   SOME Omega)        => (Omegaomega::tokens, StartS)
+            | (SymbS t,       _)                 => process'(t :: tokens, StartS)
             | (IntS s,        _)                 =>
               (case Int.fromString s of
                  SOME _ => process'(Int s :: tokens, StartS)
@@ -239,7 +249,7 @@ fun process0 (w,(tokens,state)) =
               (case Real.fromString s of
                  SOME _ => process'(Double s :: tokens, StartS)
                | NONE => raise Fail ("lex error: ilformed double " ^ s))
-            | (IdS s,         _)                 => process'(Id s :: tokens,StartS)
+            | (IdS s,         _)                 => process'(Id s :: tokens, StartS)
             | (StartS,        SOME s)            => (s::tokens,StartS)
             | (StartS,        NONE)              => if isWhiteSpace w then (tokens,state)
                                                     else raise Fail ("lex error: hmmm; what should I do with " ^ Word.toString w)
@@ -255,7 +265,7 @@ fun process0 (w,(tokens,state)) =
 fun pr_tokens ts = String.concatWith " " (List.map pr_token ts)
 
 fun lex s =
-    let val s = Utf8.fromString s
+    let val s = Utf8.fromString (s^" ")  (* pad some whitespace to keep the lexer happy *)
         val (tokens,state) = Utf8.foldl process0 (nil,StartS) s
     in rev tokens
     end

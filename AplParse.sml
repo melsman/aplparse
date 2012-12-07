@@ -29,7 +29,9 @@ fun p_int nil = NONE
 fun is_symb t =
     case t of
       L.Alpha => true
+    | L.Alphaalpha => true
     | L.Omega => true
+    | L.Omegaomega => true
     | L.Rho => true
     | L.Iota => true
     | L.Max => true
@@ -142,7 +144,7 @@ and p_indexable ts =
     || (p_symb oo (IdE o Symb))
     || (p_id oo (IdE o Var))
     || ((eat L.Lpar ->> p_expr >>- eat L.Rpar) oo ParE)
-    || ((eat L.Lbra ->> p_expr >>- eat L.Rbra) oo LambE)
+    || ((eat L.Lbra ->> p_expr >>- eat L.Rbra) oo (fn e => LambE((~1,~1),e)))
     ) ts
 
 fun parse0 ts =
@@ -213,9 +215,11 @@ fun classify e : class =
     | IdE(Symb L.Alphaalpha) => alphaalpha
     | IdE(Symb L.Omegaomega) => omegaomega
     | IdE _ => bot
-    | LambE e => bot (* don't go under a lambda *)
+    | LambE _ => bot (* don't go under a lambda *)
     | App1E (e0,e1) => lub (classify e0) (classify e1)
     | App2E (e0,e1,e2) => lub (classify e0) (lub (classify e1) (classify e2))
+    | AppOpr1E (_,e0,e1) => lub (classify e0) (classify e1)
+    | AppOpr2E (_,e0,e1,e2) => lub (classify e0) (lub (classify e1) (classify e2))
     | AssignE (v,e) => classify e
     | SeqE es => foldl (fn (e,a) => lub a (classify e)) bot es
     | ParE e => classify e
@@ -307,13 +311,15 @@ fun resolve E e =
       (case lookup E id of
          SOME s => (e,emp,s)
        | NONE => raise Fail ("resolve: identifier " ^ pr_id id ^ " not in the environment"))
-    | LambE e => 
+    | LambE(_, e) => 
       let val c = Class.classify e
           val (e,_,_) = resolve (lamb_env@E) e          
-      in (LambE e,emp,[c])
+      in (LambE(c,e),emp,[c])
       end
-    | App1E (e0,e) => raise Fail "resolve:App1"
-    | App2E (e0,e1,e2) => raise Fail "resolve:App1"
+    | App1E _ => raise Fail "resolve:App1"
+    | App2E _ => raise Fail "resolve:App1"
+    | AppOpr1E _ => raise Fail "resolve:App1"
+    | AppOpr2E _ => raise Fail "resolve:App1"
     | AssignE (v,e) =>
       let val (e,E,s) = resolve E e
           val E' = [(Var v,s)]
@@ -356,6 +362,10 @@ fun resolve E e =
           val (e,s) = res0 (rev gs)                         
       in (e,E',s)
       end
+and appOpr1((e1,s1),e2) =
+    let val derivedfunvalences = List.map #2 (appopr s1)
+    in (AppOpr1E(derivedfunvalences,e1,e2),appopr s1)
+    end
 and res0 gs =
     case gs of
       [] => raise Fail "res0: empty Unres node"
@@ -364,7 +374,7 @@ and res0 gs =
       if isFun1 s2 andalso isVal s1 then
         res0 [(App1E(e2,e1),valuespec)]
       else if isOpr1 s1 andalso isFun s2 then
-        res0 [(App1E(e1,e2),appopr s1)]
+        res0 [appOpr1((e1,s1),e2)]
       else raise Fail ("res0: could not resolve Unres node")
     | (e1,s1)::(e2,s2)::(e3,s3)::gs =>   
       if isOpr2 s3 then                                     (* ... o2 f a *)
@@ -377,9 +387,9 @@ and res0 gs =
           else if isFun1 s2 then res0 ((App1E(e2,e1),valuespec)::(e3,s3)::gs)   (* ... b f1 a ==> ... b f1(a) *)
           else if isOpr1 s2 then
             (case resFun ((e3,s3)::gs) of
-               SOME ((e3,s3)::gs) => res0 ((e1,s1)::(App1E(e2,e3),appopr s2)::gs)
+               SOME ((e3,s3)::gs) => res0 ((e1,s1)::appOpr1((e2,s2),e3)::gs)
              | SOME nil => raise Fail "res0: impossible"
-             | NONE => res0 ((e1,s1)::(App1E(e2,e3),appopr s2)::gs)) (* pass value as argument to monadic operator! *)
+             | NONE => res0 ((e1,s1)::appOpr1((e2,s2),e3)::gs)) (* pass value as argument to monadic operator! *)
           else raise Fail ("res0: dyadic operator not yet supported for e2: " ^ pr_exp e2 ^ "; e1: " ^ pr_exp e1)
         else raise Fail "res0: expecting value for e1"
 and resFun gs =
@@ -413,7 +423,6 @@ val env0 =
         (Rot,       [fun1,fun2]),
         (Vrot,      [fun1,fun2]),
         (Cat,       [fun1,fun2]),
-        (Each,      [fun2]),
         (Pow,       [fun2]),
         (Vcat,      [fun2]),
         (Lt,        [fun2]),
@@ -430,6 +439,7 @@ val env0 =
         (Nmatch,    [fun2]),
         (Intersect, [fun2]),
         (Union,     [fun2]),
+        (Each,      [opr1fun1]),
         (Slash,     [opr1fun1]),
         (Dot,       [opr2fun2])
        ]

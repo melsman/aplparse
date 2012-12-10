@@ -244,7 +244,6 @@ fun pFun2 c = c=fun2
 fun pVal c = c=value
 fun pOpr1 c = c=opr1fun1 orelse c=opr1fun2
 fun pOpr2 c = c=opr2fun1 orelse c=opr2fun2
-
 fun appopr (_,n) = (0,n)
 
 end
@@ -396,10 +395,16 @@ and resFun gs =
     case gs of
       [] => raise Fail "resFun: impossible"
     | [(e1,s1)] => if isFun s1 then SOME gs else NONE
-    | (e1,s1)::(e2,s2) :: _ =>
+    | (e1,s1)::(e2,s2) :: gs' =>
       if isOpr2 s2 then
         raise Fail "resFun: dyadic operators not yet supported"
-      else if isFun s1 then SOME gs else NONE    
+      else if isFun s1 then SOME gs 
+      else if isOpr1 s1 then
+        (case resFun ((e2,s2)::gs') of
+           SOME((e2,s2)::gs') => SOME(appOpr1((e1,s1),e2)::gs')
+         | SOME nil => raise Fail "resFun: impossible"
+         | NONE => NONE)
+      else NONE    
 
 val env0 =
     let open Class

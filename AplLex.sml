@@ -224,7 +224,7 @@ fun process0 (w,(tokens,state)) =
     let val elem = lexWord w
         fun process (tokens,state) =
             case (state, elem) of
-              (CommentS,      SOME Newline)      => (tokens, StartS)
+              (CommentS,      SOME Newline)      => (Newline::tokens, StartS)
             | (CommentS,      _           )      => (tokens, state)
             | (StartS,        SOME Macron)       => (tokens, IntS "-")
             | (StartS,        SOME (Digit c))    => (tokens, IntS(String.str c))
@@ -250,6 +250,7 @@ fun process0 (w,(tokens,state)) =
                  SOME _ => process'(Double s :: tokens, StartS)
                | NONE => raise Fail ("lex error: ilformed double " ^ s))
             | (IdS s,         _)                 => process'(Id s :: tokens, StartS)
+            | (StartS,        SOME Comment)      => (tokens,CommentS)
             | (StartS,        SOME s)            => (s::tokens,StartS)
             | (StartS,        NONE)              => if isWhiteSpace w then (tokens,state)
                                                     else raise Fail ("lex error: hmmm; what should I do with " ^ Word.toString w)

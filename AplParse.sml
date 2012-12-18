@@ -1,6 +1,6 @@
 structure AplParse : APL_PARSE = struct
 
-val p_debug = true
+val p_debug = false
 fun debug f =
     if p_debug then print(f())
     else ()
@@ -10,9 +10,9 @@ structure PComb = ParseComb(type token=token)
 
 open PComb infix >>> ->> >>- ?? || oo
 
-val p_sep = eat L.Newline || eat L.Diamond
-
 fun p_ws ts = (eat L.Newline ?? p_ws) #1 ts
+
+val p_sep = p_ws || eat L.Diamond
 
 fun p_id nil = NONE
   | p_id (L.Id id::ts) = SOME(id,ts)
@@ -46,6 +46,7 @@ fun is_symb t =
     | L.Sub => true
     | L.Times => true
     | L.Div => true
+    | L.Dot => true
     | L.Pow => true
     | L.Qmark => true
     | L.Cat => true
@@ -376,21 +377,24 @@ and res0 gs =
         res0 [appOpr1((e1,s1),e2)]
       else raise Fail ("res0: could not resolve Unres node")
     | (e1,s1)::(e2,s2)::(e3,s3)::gs =>   
-      if isOpr2 s3 then                                     (* ... o2 f a *)
-        raise Fail "res0: dyadic operators not yet supported for e3"
-      else
-        if isVal s1 then
-          if isFun2 s2 then
-            if isVal s3 then res0 ((App2E(e2,e3,e1),valuespec)::gs)        (* ... b f2 a ==> ... f2(a,b) *)
-            else raise Fail "res0: expecting value for e3"
-          else if isFun1 s2 then res0 ((App1E(e2,e1),valuespec)::(e3,s3)::gs)   (* ... b f1 a ==> ... b f1(a) *)
-          else if isOpr1 s2 then
-            (case resFun ((e3,s3)::gs) of
-               SOME ((e3,s3)::gs) => res0 ((e1,s1)::appOpr1((e2,s2),e3)::gs)
-             | SOME nil => raise Fail "res0: impossible"
-             | NONE => res0 ((e1,s1)::appOpr1((e2,s2),e3)::gs)) (* pass value as argument to monadic operator! *)
-          else raise Fail ("res0: dyadic operator not yet supported for e2: " ^ pr_exp e2 ^ "; e1: " ^ pr_exp e1)
-        else raise Fail "res0: expecting value for e1"
+      let fun cont() =
+              if isFun1 s2 then res0 ((App1E(e2,e1),valuespec)::(e3,s3)::gs)   (* ... b f1 a ==> ... b f1(a) *)
+              else if isOpr1 s2 then
+                (case resFun ((e3,s3)::gs) of
+                   SOME ((e3,s3)::gs) => res0 ((e1,s1)::appOpr1((e2,s2),e3)::gs)
+                 | SOME nil => raise Fail "res0: impossible"
+                 | NONE => res0 ((e1,s1)::appOpr1((e2,s2),e3)::gs)) (* pass value as argument to monadic operator! *)
+              else raise Fail ("res0: dyadic operator not yet supported for e2: " ^ pr_exp e2 ^ "; e1: " ^ pr_exp e1)
+      in if isOpr2 s3 then                                     (* ... o2 f a *)
+           raise Fail "res0: dyadic operators not yet supported for e3"
+         else
+           if isVal s1 then
+             if isFun2 s2 then
+               if isVal s3 then res0 ((App2E(e2,e3,e1),valuespec)::gs)        (* ... b f2 a ==> ... f2(a,b) *)
+               else cont()
+             else cont()
+           else raise Fail "res0: expecting value for e1"
+      end
 and resFun gs =
     case gs of
       [] => raise Fail "resFun: impossible"
@@ -446,7 +450,7 @@ val env0 =
         (Union,     [fun2]),
         (Each,      [opr1fun1]),
         (Slash,     [opr1fun1]),
-        (Dot,       [opr2fun2])
+        (Dot,       [fun2])  (* MEMO: back to opr2fun2 *)
        ]
     end
 

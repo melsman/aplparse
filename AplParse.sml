@@ -278,6 +278,7 @@ fun isFun1 s = isKind Class.pFun1 s
 fun isFun2 s = isKind Class.pFun2 s
 fun isOpr1 s = isKind Class.pOpr1 s
 fun isOpr2 s = isKind Class.pOpr2 s
+fun isOpr s = isOpr1 s orelse isOpr2 s
 fun isFun s = isFun1 s orelse isFun2 s
 fun appopr s = List.map Class.appopr s
 val valuespec = [Class.value]
@@ -366,6 +367,10 @@ and appOpr1((e1,s1),e2) =
     let val derivedfunvalences = List.map #2 (appopr s1)
     in (AppOpr1E(derivedfunvalences,e1,e2),appopr s1)
     end
+and appOpr2((e1,s1),e2,e3) =
+    let val derivedfunvalences = List.map #2 (appopr s1)
+    in (AppOpr2E(derivedfunvalences,e1,e2,e3),appopr s1)
+    end
 and res0 gs =
     case gs of
       [] => raise Fail "res0: empty Unres node"
@@ -380,20 +385,27 @@ and res0 gs =
       let fun cont() =
               if isFun1 s2 then res0 ((App1E(e2,e1),valuespec)::(e3,s3)::gs)   (* ... b f1 a ==> ... b f1(a) *)
               else if isOpr1 s2 then
-                (case resFun ((e3,s3)::gs) of
-                   SOME ((e3,s3)::gs) => res0 ((e1,s1)::appOpr1((e2,s2),e3)::gs)
-                 | SOME nil => raise Fail "res0: impossible"
-                 | NONE => res0 ((e1,s1)::appOpr1((e2,s2),e3)::gs)) (* pass value as argument to monadic operator! *)
-              else raise Fail ("res0: dyadic operator not yet supported for e2: " ^ pr_exp e2 ^ "; e1: " ^ pr_exp e1)
+                case resFun ((e3,s3)::gs) of
+                  SOME ((e3,s3)::gs) => res0 ((e1,s1)::appOpr1((e2,s2),e3)::gs)
+                | SOME nil => raise Fail "res0: impossible"
+                | NONE => res0 ((e1,s1)::appOpr1((e2,s2),e3)::gs) (* pass value as argument to monadic operator! *)
+              else
+                raise Fail ("res0: dyadic operator not yet supported for e2: " ^ pr_exp e2 ^ "; e1: " ^ pr_exp e1)
       in if isOpr2 s3 then                                     (* ... o2 f a *)
-           raise Fail "res0: dyadic operators not yet supported for e3"
+           case resFun gs of
+             SOME((e4,s4)::gs) =>
+             res0 ((e1,s1)::appOpr2((e3,s3),e4,e2)::gs)
+           | SOME nil => raise Fail "res0: expecting argument to dyadic operator"
+           | NONE => raise Fail "res0: expecting function argument to dyadic operator"
          else
-           if isVal s1 then
-             if isFun2 s2 then
-               if isVal s3 then res0 ((App2E(e2,e3,e1),valuespec)::gs)        (* ... b f2 a ==> ... f2(a,b) *)
-               else cont()
-             else cont()
-           else raise Fail "res0: expecting value for e1"
+           if isFun2 s2 andalso isVal s1 andalso isVal s3 then
+             res0 ((App2E(e2,e3,e1),valuespec)::gs)        (* ... b f2 a ==> ... f2(a,b) *)
+           else if isOpr2 s2 then
+             if not(isOpr s1) andalso not(isOpr s3) then
+               res0 (appOpr2((e2,s2),e3,e1)::gs)
+             else
+               raise Fail "res0: operators cannot take operators as arguments"
+           else cont()
       end
 and resFun gs =
     case gs of
@@ -450,7 +462,7 @@ val env0 =
         (Union,     [fun2]),
         (Each,      [opr1fun1]),
         (Slash,     [opr1fun1]),
-        (Dot,       [fun2])  (* MEMO: back to opr2fun2 *)
+        (Dot,       [opr2fun2])  (* MEMO: back to opr2fun2 *)
        ]
     end
 

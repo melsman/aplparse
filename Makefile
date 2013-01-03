@@ -7,7 +7,7 @@ all: $(FILES)
 test: $(FILES) test.mlb test.sml
 	$(MLCOMP) test.mlb
 
-TESTFILES=test.apl
+TESTFILES=test.apl test1.apl test2.apl test3.apl
 .PHONY: tests
 tests: test Makefile
 	$(foreach tf,$(TESTFILES),./test tests/$(tf);)

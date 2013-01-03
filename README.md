@@ -38,11 +38,11 @@ folder besides the aplparse sources.
 
 You also need a Standard ML compiler (e.g., [Mlton](http://www.mlton.org/)).
 
-Then simply write `make test` followed by `./test` in your shell.
+Then simply write `make tests` in your shell.
 
 ## Limitations
 
-Todo: Operators and improved error handling.
+Todo: improved error handling.
 
 ## License
 

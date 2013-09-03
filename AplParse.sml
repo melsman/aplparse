@@ -115,7 +115,8 @@ fun unres (UnresE es1, UnresE es2) = UnresE(es1@es2)
   | unres (e1,e2) = UnresE[e1,e2]
 
 fun p_body ts =
-    (((p_guard ?? (p_sep ->> p_body)) seq) ?? p_ws) #1 ts
+    (((((p_guard ?? (p_sep ->> p_body)) seq) ?? p_ws) #1)
+     || (p_sep ->> p_body)) ts
 
 and p_guard ts =
     (p_expr ?? (eat L.Colon ->> p_expr)) GuardE ts
@@ -145,7 +146,7 @@ and p_indexable ts =
     || (p_symb oo (IdE o Symb))
     || (p_id oo (IdE o Var))
     || ((eat L.Lpar ->> p_expr >>- eat L.Rpar) oo ParE)
-    || ((eat L.Lbra ->> p_expr >>- eat L.Rbra) oo (fn e => LambE((~1,~1),e)))
+    || ((eat L.Lbra ->> p_body >>- eat L.Rbra) oo (fn e => LambE((~1,~1),e)))
     ) ts
 
 fun parse0 ts =

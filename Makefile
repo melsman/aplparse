@@ -7,10 +7,10 @@ all: $(FILES)
 test: $(FILES) test.mlb test.sml
 	$(MLCOMP) test.mlb
 
-TESTFILES=test.apl test1.apl test2.apl test3.apl
+TESTFILES=test.apl test1.apl test2.apl test3.apl test4.apl test5.apl
 .PHONY: tests
 tests: test Makefile
 	$(foreach tf,$(TESTFILES),./test tests/$(tf);)
 
 clean:
-	rm -rf *~ MLB aplparse test
+	rm -rf *~ MLB aplparse test tests/*~

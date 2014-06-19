@@ -432,7 +432,7 @@ val env0 =
         (Max,       [fun1,fun2]),
         (Min,       [fun1,fun2]),
         (Iota,      [fun1]),
-        (Trans,     [fun1]),
+        (Trans,     [fun1,fun2]),
         (Enclose,   [fun1]),
         (Disclose,  [fun1]),
         (Gradeup,   [fun1]),

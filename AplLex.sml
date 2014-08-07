@@ -128,12 +128,16 @@ fun pr_token t =
        | Int i => i
        | Double r => r
 
+type loc = int * int
+type reg = loc * loc
+val loc0 : loc = (1,1) (* line 1, char 1 *)
+
 datatype state = CommentS
                | StartS
-               | SymbS of token   (* for lexing Alphaalpha and Omegaomega *)
-               | IntS of string
-               | DoubleS of string
-               | IdS of string
+               | SymbS of token * loc * loc   (* for lexing Alphaalpha and Omegaomega *)
+               | IntS of string * loc * loc
+               | DoubleS of string * loc * loc
+               | IdS of string * loc * loc
 
 fun getChar w =
     if w < 0w128 then SOME(Char.chr(Word.toInt w))
@@ -220,54 +224,60 @@ fun isWhiteSpace w =
       SOME c => Char.isSpace c
     | NONE => false
 
-fun process0 (w,(tokens,state)) =
+fun lexError loc s = 
+    let val msg = "Lexical error at location " ^ Region.ppLoc loc ^ ": " ^ s
+    in raise Fail msg
+    end
+
+fun process0 (w,(tokens,state,loc)) =
     let val elem = lexWord w
-        fun process (tokens,state) =
+        fun process (tokens,state,loc) =
             case (state, elem) of
-              (CommentS,      SOME Newline)      => (Newline::tokens, StartS)
-            | (CommentS,      _           )      => (tokens, state)
-            | (StartS,        SOME Macron)       => (tokens, IntS "-")
-            | (StartS,        SOME (Digit c))    => (tokens, IntS(String.str c))
-            | (IntS s,        SOME (Digit c))    => (tokens, IntS(s ^ String.str c))
-            | (DoubleS s,     SOME (Digit c))    => (tokens, DoubleS(s ^ String.str c))
-            | (IntS s,        SOME (Letter c))   => raise Fail "lex error: ilformed integer"
-            | (DoubleS s,     SOME (Letter c))   => raise Fail "lex error: ilformed double"
-            | (IntS s,        SOME Dot)          => (tokens, DoubleS(s ^ "."))
-            | (StartS,        SOME (Letter c))   => (tokens, IdS(String.str c))
-            | (IdS s,         SOME (Letter c))   => (tokens, IdS(s ^ String.str c))
-            | (IdS s,         SOME (Digit c))    => (tokens, IdS(s ^ String.str c))
-            | (StartS,        SOME Alpha)        => (tokens, SymbS Alpha)
-            | (StartS,        SOME Omega)        => (tokens, SymbS Omega)
-            | (SymbS Alpha,   SOME Alpha)        => (Alphaalpha::tokens, StartS)
-            | (SymbS Omega,   SOME Omega)        => (Omegaomega::tokens, StartS)
-            | (SymbS t,       _)                 => process'(t :: tokens, StartS)
-            | (IntS s,        _)                 =>
+              (CommentS,      SOME Newline)      => ((Newline,(loc,loc))::tokens, StartS, Region.newline loc)
+            | (CommentS,      _           )      => (tokens, state, Region.next loc)
+            | (StartS,        SOME Macron)       => (tokens, IntS("-",loc,loc), Region.next loc)
+            | (StartS,        SOME (Digit c))    => (tokens, IntS(String.str c,loc,loc), Region.next loc)
+            | (IntS(s,l0,_),  SOME (Digit c))    => (tokens, IntS(s ^ String.str c,l0,loc), Region.next loc)
+            | (DoubleS(s,l0,_), SOME (Digit c))  => (tokens, DoubleS(s ^ String.str c,l0,loc), Region.next loc)
+            | (IntS(s,l0,_),  SOME (Letter c))   => lexError loc "ilformed integer"
+            | (DoubleS(s,l0,_), SOME (Letter c)) => lexError loc "ilformed double"
+            | (IntS(s,l0,_),  SOME Dot)          => (tokens, DoubleS(s ^ ".",l0,loc), Region.next loc)
+            | (StartS,        SOME (Letter c))   => (tokens, IdS(String.str c,loc,loc), Region.next loc)
+            | (IdS(s,l0,_),   SOME (Letter c))   => (tokens, IdS(s ^ String.str c,l0,loc), Region.next loc)
+            | (IdS(s,l0,_),   SOME (Digit c))    => (tokens, IdS(s ^ String.str c,l0,loc), Region.next loc)
+            | (StartS,        SOME Alpha)        => (tokens, SymbS(Alpha,loc,loc), Region.next loc)
+            | (StartS,        SOME Omega)        => (tokens, SymbS(Omega,loc,loc), Region.next loc)
+            | (SymbS(Alpha,l0,_), SOME Alpha)    => ((Alphaalpha,(l0,loc))::tokens, StartS, Region.next loc)
+            | (SymbS(Omega,l0,_), SOME Omega)    => ((Omegaomega,(l0,loc))::tokens, StartS, Region.next loc)
+            | (SymbS(t,l0,l1), _)                => process'((t,(l0,l1))::tokens, StartS, loc)
+            | (IntS(s,l0,l1), _)                 =>
               (case Int.fromString s of
-                 SOME _ => process'(Int s :: tokens, StartS)
-               | NONE => raise Fail ("lex error: ilformed integer " ^ s))
-            | (DoubleS s,        _)                 =>
+                 SOME _ => process'((Int s,(l0,l1))::tokens, StartS, loc)
+               | NONE => lexError loc ("ilformed integer " ^ s))
+            | (DoubleS(s,l0,l1), _)              =>
               (case Real.fromString s of
-                 SOME _ => process'(Double s :: tokens, StartS)
-               | NONE => raise Fail ("lex error: ilformed double " ^ s))
-            | (IdS s,         _)                 => process'(Id s :: tokens, StartS)
-            | (StartS,        SOME Comment)      => (tokens,CommentS)
-            | (StartS,        SOME s)            => (s::tokens,StartS)
-            | (StartS,        NONE)              => if isWhiteSpace w then (tokens,state)
-                                                    else raise Fail ("lex error: hmmm; what should I do with " ^ Word.toString w)
-                                                          
-        and process'(tokens,s) =
+                 SOME _ => process'((Double s,(l0,l1)) :: tokens, StartS, loc)
+               | NONE => lexError loc ("ilformed double " ^ s))
+            | (IdS(s,l0,l1),  _)                 => process'((Id s,(l0,l1))::tokens, StartS, loc)
+            | (StartS,        SOME Comment)      => (tokens,CommentS, Region.next loc)
+            | (StartS,        SOME s)            => ((s,(loc,loc))::tokens,StartS,
+                                                     if s = Newline then Region.newline loc
+                                                     else Region.next loc)
+            | (StartS,        NONE)              => if isWhiteSpace w then (tokens,state,Region.next loc)
+                                                    else lexError loc ("don't know what to do with " ^ Word.toString w)
+        and process'(tokens,s,loc) =
             case elem of
-              SOME Comment => (tokens,CommentS)
-            | _ => process(tokens,s)
+              SOME Comment => (tokens,CommentS,loc)
+            | _ => process(tokens,s,loc)
     in
-      process(tokens,state)
+      process(tokens,state,loc)
     end
 
 fun pr_tokens ts = String.concatWith " " (List.map pr_token ts)
 
 fun lex s =
     let val s = Utf8.fromString (s^" ")  (* pad some whitespace to keep the lexer happy *)
-        val (tokens,state) = Utf8.foldl process0 (nil,StartS) s
+        val (tokens,state,_) = Utf8.foldl process0 (nil,StartS,loc0) s
     in rev tokens
     end
 end

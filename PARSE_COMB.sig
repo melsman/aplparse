@@ -1,6 +1,6 @@
 signature PARSE_COMB = sig
   type token
-  type 'a p = token list -> ('a * token list) option
+  type 'a p = (token*Region.reg)list -> ('a * Region.reg * (token*Region.reg)list) option
     
   val >>> : 'a p * 'b p -> ('a*'b)p
   val ->> : unit p * 'b p -> 'b p

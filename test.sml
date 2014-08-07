@@ -15,7 +15,7 @@ val ts = AplLex.lex c
 
 fun prln s = print(s ^ "\n")
 val () = prln "File lexed:"
-val () = prln(" " ^ AplLex.pr_tokens ts)
+val () = prln(" " ^ AplLex.pr_tokens (map #1 ts))
 
 val () = prln "Parsing tokens..."
 val () = case AplParse.parse AplParse.env0 ts of

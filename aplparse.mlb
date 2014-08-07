@@ -2,6 +2,8 @@ local
    $(SML_LIB)/basis/basis.mlb
    ../smlunicode/unicode.mlb
 in
+   REGION.sig
+   Region.sml
    PARSE_COMB.sig
    ParseComb.sml
    AplLex.sml

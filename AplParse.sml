@@ -15,15 +15,15 @@ fun p_ws ts = (eat L.Newline ?? p_ws) #1 ts
 val p_sep = p_ws || eat L.Diamond
 
 fun p_id nil = NONE
-  | p_id (L.Id id::ts) = SOME(id,ts)
+  | p_id ((L.Id id,r)::ts) = SOME(id,r,ts)
   | p_id _ = NONE
 
 fun p_double nil = NONE
-  | p_double (L.Double d::ts) = SOME(d,ts)
+  | p_double ((L.Double d,r)::ts) = SOME(d,r,ts)
   | p_double _ = NONE
 
 fun p_int nil = NONE
-  | p_int (L.Int i::ts) = SOME(i,ts)
+  | p_int ((L.Int i,r)::ts) = SOME(i,r,ts)
   | p_int _ = NONE
 
 fun is_symb t =
@@ -75,7 +75,7 @@ fun is_symb t =
     | _ => false
 
 fun p_symb nil = NONE
-  | p_symb (t::ts) = if is_symb t then SOME(t,ts) else NONE
+  | p_symb ((t,r)::ts) = if is_symb t then SOME(t,r,ts) else NONE
 
 (* APL Parsing *)
 
@@ -151,7 +151,7 @@ and p_indexable ts =
 
 fun parse0 ts =
     case p_body ts of
-      SOME(ast,ts) => 
+      SOME(ast,r,ts) => 
       (case ts of nil => SOME ast
                 | _ => NONE)
     | NONE => NONE

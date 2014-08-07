@@ -3,5 +3,5 @@ signature APL_PARSE = sig
   val emp  : env
   val env0 : env
   val plus : env * env -> env
-  val parse : env -> AplLex.token list -> (AplAst.exp * env) option
+  val parse : env -> (AplLex.token * Region.reg) list -> (AplAst.exp * env) option
 end

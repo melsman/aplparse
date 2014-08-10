@@ -12,12 +12,12 @@ fun err s p ts =
       NONE => raise ParseError s
     | x => x
 
-infix >>> ->> >>- ?? || oo
+infix >>> ->> >>- ?? ??? || oo oor
 fun p1 >>> p2 = fn ts =>
     case p1 ts of
       SOME(v1,r1,ts) =>
       (case p2 ts of
-         SOME(v2,r2,ts) => SOME((v1,v2), Region.plus r1 r2, ts)
+         SOME(v2,r2,ts) => SOME((v1,v2), Region.plus ">>>" r1 r2, ts)
        | NONE => NONE)
     | NONE => NONE
 
@@ -25,7 +25,7 @@ fun p1 ->> p2 = fn ts =>
     case p1 ts of
       SOME((),r1,ts) =>
       (case p2 ts of
-         SOME(v2,r2,ts) => SOME(v2, Region.plus r1 r2, ts)
+         SOME(v2,r2,ts) => SOME(v2, Region.plus "->>" r1 r2, ts)
        | NONE => NONE)
     | NONE => NONE
 
@@ -33,7 +33,7 @@ fun p1 >>- p2 = fn ts =>
     case p1 ts of
       SOME(v,r1,ts) =>
       (case p2 ts of
-         SOME((),r2,ts) => SOME(v, Region.plus r1 r2, ts)
+         SOME((),r2,ts) => SOME(v, Region.plus ">>-" r1 r2, ts)
        | NONE => NONE)
     | NONE => NONE
 
@@ -41,7 +41,18 @@ fun p1 ?? p2 = fn f => fn ts =>
     case p1 ts of
       SOME(v1,r1,ts) =>
       (case p2 ts of
-         SOME(v2,r2,ts) => SOME(f(v1,v2), Region.plus r1 r2, ts)
+         SOME(v2,r2,ts) => SOME(f(v1,v2), Region.plus "??" r1 r2, ts)
+       | NONE => SOME(v1,r1,ts))
+    | NONE => NONE
+
+fun p1 ??? p2 = fn f => fn ts =>
+    case p1 ts of
+      SOME(v1,r1,ts) =>
+      (case p2 ts of
+         SOME(v2,r2,ts) => 
+         let val r = Region.plus "???" r1 r2
+         in SOME(f(v1,v2,r), r, ts)
+         end
        | NONE => SOME(v1,r1,ts))
     | NONE => NONE
 
@@ -61,6 +72,11 @@ fun ign p ts =
 fun p oo f = fn ts =>
     case p ts of
       SOME(v,r,ts) => SOME(f v,r,ts)
+    | NONE => NONE
+
+fun p oor f = fn ts =>
+    case p ts of
+      SOME(v,r,ts) => SOME(f(v,r),r,ts)
     | NONE => NONE
 
 fun eat t ts =

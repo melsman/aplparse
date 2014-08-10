@@ -8,7 +8,7 @@ fun debug f =
 open AplAst
 structure PComb = ParseComb(type token=token)
 
-open PComb infix >>> ->> >>- ?? || oo
+open PComb infix >>> ->> >>- ?? ??? || oo oor
 
 fun p_ws ts = (eat L.Newline ?? p_ws) #1 ts
 
@@ -104,22 +104,22 @@ fun p_symb nil = NONE
                | ( expr ) | { body }
 *)
 
-fun seq (SeqE es1, SeqE es2) = SeqE(es1@es2)
-  | seq (SeqE es, e) = SeqE(es @ [e])
-  | seq (e, SeqE es) = SeqE(e::es)
-  | seq (e1,e2) = SeqE[e1,e2]
+fun seq (SeqE (es1,r1), SeqE (es2,r2)) = SeqE(es1@es2,Region.plus "seq1" r1 r2)
+  | seq (SeqE (es,r), e) = SeqE(es @ [e],Region.plus "seq2" r (reg_exp e))
+  | seq (e, SeqE (es,r)) = SeqE(e::es,Region.plus "seq3" (reg_exp e) r)
+  | seq (e1,e2) = SeqE([e1,e2],Region.plus "seq4"(reg_exp e1)(reg_exp e2))
 
-fun unres (UnresE es1, UnresE es2) = UnresE(es1@es2)
-  | unres (UnresE es, e) = UnresE(es @ [e])
-  | unres (e, UnresE es) = UnresE(e::es)
-  | unres (e1,e2) = UnresE[e1,e2]
+fun unres (UnresE (es1,r1), UnresE (es2,r2)) = UnresE(es1@es2,Region.plus "unres1"r1 r2)
+  | unres (UnresE (es,r), e) = UnresE(es @ [e],Region.plus "unres2" r (reg_exp e))
+  | unres (e, UnresE (es,r)) = UnresE(e::es,Region.plus "unres3" (reg_exp e) r)
+  | unres (e1,e2) = UnresE([e1,e2],Region.plus "unres4" (reg_exp e1)(reg_exp e2))
 
 fun p_body ts =
     (((((p_guard ?? (p_sep ->> p_body)) seq) ?? p_ws) #1)
      || (p_sep ->> p_body)) ts
 
 and p_guard ts =
-    (p_expr ?? (eat L.Colon ->> p_expr)) GuardE ts
+    (p_expr ??? (eat L.Colon ->> p_expr)) GuardE ts
 
 and p_expr ts =
     (  p_assignment 
@@ -127,13 +127,13 @@ and p_expr ts =
     ) ts
 
 and p_assignment ts =
-    (p_id >>- eat L.Larrow >>> p_expr oo AssignE) ts
+    (p_id >>- eat L.Larrow >>> p_expr oor (fn ((a,b),r) => AssignE(a,b,r))) ts
 
 and p_seq ts =
     (p_item ?? p_seq) unres ts
 
 and p_item ts =
-    (p_indexable ?? (eat L.Lsqbra ->> p_indices >>- eat L.Rsqbra)) IndexE ts
+    (p_indexable ??? (eat L.Lsqbra ->> p_indices >>- eat L.Rsqbra)) IndexE ts
 
 and p_indices ts =
     (  (p_expr oo (fn x => [SOME x]) ?? (eat L.Semicolon ->> p_indices)) (op @)
@@ -141,12 +141,12 @@ and p_indices ts =
     ) ts
 
 and p_indexable ts =
-    (  (p_int oo IntE)
-    || (p_double oo DoubleE)
-    || (p_symb oo (IdE o Symb))
-    || (p_id oo (IdE o Var))
-    || ((eat L.Lpar ->> p_expr >>- eat L.Rpar) oo ParE)
-    || ((eat L.Lbra ->> p_body >>- eat L.Rbra) oo (fn e => LambE((~1,~1),e)))
+    (  (p_int oor IntE)
+    || (p_double oor DoubleE)
+    || (p_symb oor (fn (a,r) => IdE(Symb a,r)))
+    || (p_id oor (fn (a,r) => IdE(Var a,r)))
+    || ((eat L.Lpar ->> p_expr >>- eat L.Rpar) oor ParE)
+    || ((eat L.Lbra ->> p_body >>- eat L.Rbra) oor (fn (e,r) => LambE((~1,~1),e,r)))
     ) ts
 
 fun parse0 ts =
@@ -164,7 +164,10 @@ fun resolve_vectors es =
 
       fun vec [e] = e
         | vec nil = raise Fail "resolve_vectors.vec"
-        | vec es = VecE es
+        | vec (e::es) = 
+          let val r = reg_exps (reg_exp e) es
+          in VecE(e::es,r)
+          end
       
       val (es,opt) =
             foldl (fn (e, (es,NONE)) => if immed e then (es,SOME[e])
@@ -212,24 +215,24 @@ fun classify e : class =
     | DoubleE s => bot
     | VecE _ => bot
     | StrE s => bot
-    | IdE(Symb L.Omega) => omega
-    | IdE(Symb L.Alpha) => alpha
-    | IdE(Symb L.Alphaalpha) => alphaalpha
-    | IdE(Symb L.Omegaomega) => omegaomega
+    | IdE(Symb L.Omega,_) => omega
+    | IdE(Symb L.Alpha,_) => alpha
+    | IdE(Symb L.Alphaalpha,_) => alphaalpha
+    | IdE(Symb L.Omegaomega,_) => omegaomega
     | IdE _ => bot
     | LambE _ => bot (* don't go under a lambda *)
-    | App1E (e0,e1) => lub (classify e0) (classify e1)
-    | App2E (e0,e1,e2) => lub (classify e0) (lub (classify e1) (classify e2))
-    | AppOpr1E (_,e0,e1) => lub (classify e0) (classify e1)
-    | AppOpr2E (_,e0,e1,e2) => lub (classify e0) (lub (classify e1) (classify e2))
-    | AssignE (v,e) => classify e
-    | SeqE es => foldl (fn (e,a) => lub a (classify e)) bot es
-    | ParE e => classify e
-    | GuardE (e1,e2) => lub (classify e1) (classify e2)
-    | IndexE (e0,is) =>
+    | App1E (e0,e1,_) => lub (classify e0) (classify e1)
+    | App2E (e0,e1,e2,_) => lub (classify e0) (lub (classify e1) (classify e2))
+    | AppOpr1E (_,e0,e1,_) => lub (classify e0) (classify e1)
+    | AppOpr2E (_,e0,e1,e2,_) => lub (classify e0) (lub (classify e1) (classify e2))
+    | AssignE (v,e,_) => classify e
+    | SeqE(es,_) => foldl (fn (e,a) => lub a (classify e)) bot es
+    | ParE(e,_) => classify e
+    | GuardE (e1,e2,_) => lub (classify e1) (classify e2)
+    | IndexE (e0,is,_) =>
       foldl(fn (NONE, a) => a
              | (SOME e, a) => lub a (classify e)) (classify e0) is
-    | UnresE es => foldl (fn (e,a) => lub a (classify e)) bot es
+    | UnresE(es,_) => foldl (fn (e,a) => lub a (classify e)) bot es
 
 fun pr_class (x,y) = "Cls(" ^ Int.toString x ^ "," ^ Int.toString y ^ ")"
 
@@ -303,49 +306,52 @@ val lamb_env =
  v(App2E(App1E(x3,x2),app1E(x4,app1E(x5,x6)),x1))
 *)
 
+fun resolveErr r msg =
+    raise Fail ("Resolve Error: " ^ Region.pp r ^ ".\n  " ^ msg)
+
 fun resolve E e =
     case e of
-      IntE s => (e,emp,valuespec)
-    | DoubleE s => (e,emp,valuespec)
+      IntE _ => (e,emp,valuespec)
+    | DoubleE _ => (e,emp,valuespec)
     | VecE _ => (e,emp,valuespec)
     | StrE s => (e,emp,valuespec)
-    | IdE id => 
+    | IdE (id,r) => 
       (case lookup E id of
          SOME s => (e,emp,s)
-       | NONE => raise Fail ("resolve: identifier " ^ pr_id id ^ " not in the environment"))
-    | LambE(_, e) => 
+       | NONE => resolveErr r ("The identifier " ^ pr_id id ^ " is not in the environment"))
+    | LambE (_,e,r) => 
       let val c = Class.classify e
           val (e,_,_) = resolve (lamb_env@E) e          
-      in (LambE(c,e),emp,[c])
+      in (LambE(c,e,r),emp,[c])
       end
     | App1E _ => raise Fail "resolve:App1"
     | App2E _ => raise Fail "resolve:App1"
     | AppOpr1E _ => raise Fail "resolve:App1"
     | AppOpr2E _ => raise Fail "resolve:App1"
-    | AssignE (v,e) =>
+    | AssignE (v,e,r) =>
       let val (e,E,s) = resolve E e
           val E' = [(Var v,s)]
-      in (AssignE(v,e),E',s)
+      in (AssignE(v,e,r),E',s)
       end
-    | SeqE es => 
+    | SeqE (es,r) => 
       let val (es,E,s) =
               foldl (fn (e,(es,E0,_)) =>
                         let val () = debug(fn () => "Resolving:\n " ^ pr_exp e ^ "\n")
                             val (e,E2,s) = resolve (E0@E) e
                         in (e::es,E2@E0,s)
                         end) (nil,emp,valuespec) es
-      in (SeqE (rev es),E,s)
+      in (SeqE (rev es,r),E,s)
       end
-    | ParE e => 
+    | ParE (e,_) => 
       let val (e,E,s) = resolve E e
       in (e,E,s)
       end
-    | GuardE (e1,e2) =>
+    | GuardE (e1,e2,r) =>
       let val (e1,E1,_) = resolve E e1                       (* memo: maybe check for valuespec *)
           val (e2,E2,s) = resolve (E1@E) e2
-      in (GuardE(e1,e2),E2@E1,s)
+      in (GuardE(e1,e2,r),E2@E1,s)
       end
-    | IndexE (e0,is) =>
+    | IndexE (e0,is,r) =>
       let val (is,E1) =
               foldl (fn (NONE, (is,E0)) => (NONE::is,E0)
                       | (SOME i, (is, E0)) => 
@@ -353,57 +359,68 @@ fun resolve E e =
                         in (SOME i::is,E2@E0)
                         end) (nil,emp) is
           val (e0,E0,_) = resolve (E1@E) e0                  (* memo: maybe check for valuespec *)
-      in (IndexE(e0,rev is),E0@E1,valuespec)
+      in (IndexE(e0,rev is,r),E0@E1,valuespec)
       end
-    | UnresE es =>
+    | UnresE (es,r) =>
       let val es = resolve_vectors es
           val (gs, E') = foldl (fn (e,(gs,E')) => 
                                    let val (e,E'',s) = resolve (E'@E) e
                                    in ((e,s)::gs,E''@E')
                                    end) (nil,emp) (rev es)
-          val (e,s) = res0 (rev gs)                         
+          val (e,s) = res0 r (rev gs)                         
       in (e,E',s)
       end
 and appOpr1((e1,s1),e2) =
     let val derivedfunvalences = List.map #2 (appopr s1)
-    in (AppOpr1E(derivedfunvalences,e1,e2),appopr s1)
+        val r = Region.plus "appOpr1" (reg_exp e2) (reg_exp e1)
+    in (AppOpr1E(derivedfunvalences,e1,e2,r),appopr s1)
     end
 and appOpr2((e1,s1),e2,e3) =
     let val derivedfunvalences = List.map #2 (appopr s1)
-    in (AppOpr2E(derivedfunvalences,e1,e2,e3),appopr s1)
+        val r = Region.plus "appOpr2" (reg_exp e2) (reg_exp e3)
+    in (AppOpr2E(derivedfunvalences,e1,e2,e3,r),appopr s1)
     end
-and res0 gs =
+and app1(e1,e2) =
+    let val r = Region.plus "app1" (reg_exp e1) (reg_exp e2)
+    in (App1E(e1,e2,r),valuespec)
+    end
+and app2(e1,e2,e3) =
+    let val r = Region.plus "app2" (reg_exp e2) (reg_exp e3)
+    in (App2E(e1,e2,e3,r),valuespec)
+    end
+and res0 r gs =
     case gs of
       [] => raise Fail "res0: empty Unres node"
     | [g] => g
     | [(e1,s1),(e2,s2)] =>
       if isFun1 s2 andalso isVal s1 then
-        res0 [(App1E(e2,e1),valuespec)]
+        res0 r [app1(e2,e1)]
       else if isOpr1 s1 andalso isFun s2 then
-        res0 [appOpr1((e1,s1),e2)]
-      else raise Fail ("res0: could not resolve Unres node")
+        res0 r [appOpr1((e1,s1),e2)]
+      else resolveErr (Region.plus "res0.1" (reg_exp e2) (reg_exp e1)) "could not resolve Unres node"
     | (e1,s1)::(e2,s2)::(e3,s3)::gs =>   
       let fun cont() =
-              if isFun1 s2 then res0 ((App1E(e2,e1),valuespec)::(e3,s3)::gs)   (* ... b f1 a ==> ... b f1(a) *)
+              if isFun1 s2 then res0 r (app1(e2,e1)::(e3,s3)::gs)   (* ... b f1 a ==> ... b f1(a) *)
               else if isOpr1 s2 then
                 case resFun ((e3,s3)::gs) of
-                  SOME ((e3,s3)::gs) => res0 ((e1,s1)::appOpr1((e2,s2),e3)::gs)
+                  SOME ((e3,s3)::gs) => res0 r ((e1,s1)::appOpr1((e2,s2),e3)::gs)
                 | SOME nil => raise Fail "res0: impossible"
-                | NONE => res0 ((e1,s1)::appOpr1((e2,s2),e3)::gs) (* pass value as argument to monadic operator! *)
+                | NONE => res0 r ((e1,s1)::appOpr1((e2,s2),e3)::gs) (* pass value as argument to monadic operator! *)
               else
-                raise Fail ("res0: dyadic operator not yet supported for e2: " ^ pr_exp e2 ^ "; e1: " ^ pr_exp e1)
+                resolveErr (Region.plus "res0.2" (reg_exp e3) (reg_exp e1))
+                           ("dyadic operator not yet supported for e2: " ^ pr_exp e2 ^ "; e1: " ^ pr_exp e1)
       in if isOpr2 s3 then                                     (* ... o2 f a *)
            case resFun gs of
              SOME((e4,s4)::gs) =>
-             res0 ((e1,s1)::appOpr2((e3,s3),e4,e2)::gs)
+             res0 r ((e1,s1)::appOpr2((e3,s3),e4,e2)::gs)
            | SOME nil => raise Fail "res0: expecting argument to dyadic operator"
            | NONE => raise Fail "res0: expecting function argument to dyadic operator"
          else
            if isFun2 s2 andalso isVal s1 andalso isVal s3 then
-             res0 ((App2E(e2,e3,e1),valuespec)::gs)        (* ... b f2 a ==> ... f2(a,b) *)
+             res0 r (app2(e2,e3,e1)::gs)        (* ... b f2 a ==> ... f2(a,b) *)
            else if isOpr2 s2 then
              if not(isOpr s1) andalso not(isOpr s3) then
-               res0 (appOpr2((e2,s2),e3,e1)::gs)
+               res0 r (appOpr2((e2,s2),e3,e1)::gs)
              else
                raise Fail "res0: operators cannot take operators as arguments"
            else cont()
@@ -421,7 +438,7 @@ and resFun gs =
            SOME((e2,s2)::gs') => SOME(appOpr1((e1,s1),e2)::gs')
          | SOME nil => raise Fail "resFun: impossible"
          | NONE => NONE)
-      else NONE    
+      else NONE
 
 val env0 =
     let open Class

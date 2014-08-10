@@ -11,5 +11,5 @@ signature REGION = sig
   val wf : reg -> bool                      
   val ppLoc : loc -> string      
   val pp : reg -> string
-  val plus : reg -> reg -> reg
+  val plus : string -> reg -> reg -> reg
 end

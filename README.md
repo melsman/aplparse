@@ -30,10 +30,9 @@ compiles into the following abstract syntax tree (pretty printed):
 
 ## Try it!
 
-The software makes use of the [smlunicode
-library](https://github.com/melsman/smlunicode) for lexing, which
+The software makes use of the Standard ML [unicode library](https://github.com/melsman/smlunicode) for lexing, which
 means that you need to checkout the
-[smlunicode](https://github.com/melsman/smlunicode) sources in a
+[unicode](https://github.com/melsman/unicode) sources in a
 folder besides the aplparse sources.
 
 You also need a Standard ML compiler (e.g., [Mlton](http://www.mlton.org/)).

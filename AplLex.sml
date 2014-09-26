@@ -52,6 +52,8 @@ datatype token =
        | Id of string
        | Int of string
        | Double of string
+       | Dollar
+       | Underscore
 
 fun pr_token t =
     case t of
@@ -127,10 +129,13 @@ fun pr_token t =
        | Id s => "Id(" ^ s ^ ")"
        | Int i => i
        | Double r => r
+       | Dollar => "Dollar"
+       | Underscore => "Underscore"
 
-type loc = int * int
-type reg = loc * loc
-val loc0 : loc = (1,1) (* line 1, char 1 *)
+type filename = Region.filename
+type loc = Region.loc
+type reg = Region.reg
+fun loc0 f : loc = (1,1,f) (* line 1, char 1 *)
 
 datatype state = CommentS
                | StartS
@@ -213,6 +218,8 @@ fun lexWord w =
         | SOME #"]" => SOME Rsqbra
         | SOME #":" => SOME Colon
         | SOME #";" => SOME Semicolon
+        | SOME #"$" => SOME Dollar
+        | SOME #"_" => SOME Underscore
         | SOME c =>
           if Char.isDigit c then SOME(Digit c)
           else if Char.isAlpha c then SOME(Letter c)
@@ -243,6 +250,8 @@ fun process0 (w,(tokens,state,loc)) =
             | (DoubleS(s,l0,_), SOME (Letter c)) => lexError loc "ilformed double"
             | (IntS(s,l0,_),  SOME Dot)          => (tokens, DoubleS(s ^ ".",l0,loc), Region.next loc)
             | (StartS,        SOME (Letter c))   => (tokens, IdS(String.str c,loc,loc), Region.next loc)
+            | (StartS,        SOME Dollar)       => (tokens, IdS("$",loc,loc), Region.next loc)
+            | (StartS,        SOME Underscore)   => (tokens, IdS("_",loc,loc), Region.next loc)
             | (IdS(s,l0,_),   SOME (Letter c))   => (tokens, IdS(s ^ String.str c,l0,loc), Region.next loc)
             | (IdS(s,l0,_),   SOME (Digit c))    => (tokens, IdS(s ^ String.str c,l0,loc), Region.next loc)
             | (StartS,        SOME Alpha)        => (tokens, SymbS(Alpha,loc,loc), Region.next loc)
@@ -275,9 +284,9 @@ fun process0 (w,(tokens,state,loc)) =
 
 fun pr_tokens ts = String.concatWith " " (List.map pr_token ts)
 
-fun lex s =
+fun lex filename s =
     let val s = Utf8.fromString (s^" ")  (* pad some whitespace to keep the lexer happy *)
-        val (tokens,state,_) = Utf8.foldl process0 (nil,StartS,loc0) s
+        val (tokens,state,_) = Utf8.foldl process0 (nil,StartS,Region.loc0 filename) s
     in rev tokens
     end
 end

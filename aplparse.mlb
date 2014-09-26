@@ -1,6 +1,6 @@
 local
    $(SML_LIB)/basis/basis.mlb
-   ../smlunicode/unicode.mlb
+   ../unicode/unicode.mlb
 in
    REGION.sig
    Region.sml

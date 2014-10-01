@@ -1,3 +1,4 @@
+(** Simple parser combinator library that keeps track of position information. *)
 signature PARSE_COMB = sig
   type token
   type 'a p = (token*Region.reg)list -> ('a * Region.reg * (token*Region.reg)list) option
@@ -14,3 +15,10 @@ signature PARSE_COMB = sig
   val err : string -> 'a p -> 'a p
   val oor : 'a p * ('a*Region.reg -> 'b) -> 'b p
 end
+
+(**
+[token] type of tokens.
+
+['a p] type of parsers that parse values of type 'a.
+
+*)

@@ -1,4 +1,4 @@
-MLCOMP ?= mlton
+MLCOMP ?= mlton -mlb-path-map $(HOME)/.mlton/mlb-path-map
 FILES=aplparse.mlb REGION.sig Region.sml AplLex.sml AplParse.sml ParseComb.sml PARSE_COMB.sig test.sml test.mlb
 
 .PHONY: all

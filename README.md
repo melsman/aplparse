@@ -30,18 +30,37 @@ compiles into the following abstract syntax tree (pretty printed):
 
 ## Try it!
 
-The software makes use of the Standard ML [unicode library](https://github.com/melsman/smlunicode) for lexing, which
-means that you need to checkout the
-[unicode](https://github.com/melsman/unicode) sources in a
-folder besides the aplparse sources.
+The parser compiles with either [MLton](http://mlton.org) or
+[MLKit](http://www.elsman.com/mlkit/). 
 
-You also need a Standard ML compiler (e.g., [Mlton](http://www.mlton.org/)).
+For compilation and use,
+[Smackage](https://github.com/standardml/smackage) is assumed. Add the
+following entry to your `~/.smackage/sources.local` file:
 
-Then simply write `make tests` in your shell.
+    aplparse git git://github.com/melsman/aplparse.git
+
+Now write
+
+    $ smackage refresh
+    $ smackage get aplparse
+
+The implementation builds on the unicode library available at
+[https://github.com/melsman/unicode](https://github.com/melsman/unicode),
+but Smackage will arrange for this library to be fetched and installed
+automatically.
+
+Then simply write `smackage make aplparse tests` in your shell.
+
+To use the MLKit as a compiler, write instead:
+
+    $ smackage make aplparse clean
+    $ MLCOMP=mlkit smackage make aplparse tests
 
 ## Limitations
 
-Todo: improved error handling.
+Todo: improved error handling. Although position information is now
+maintained in the parser, not all parser errors are reported with
+relevant position information.
 
 ## License
 

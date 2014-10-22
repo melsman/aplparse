@@ -72,6 +72,7 @@ fun is_symb t =
     | L.Tilde => true
     | L.Intersect => true
     | L.Union => true
+    | L.StarDia => true
     | _ => false
 
 fun p_symb nil = NONE
@@ -479,6 +480,7 @@ val env0 =
         (Intersect, [fun2]),
         (Union,     [fun2]),
         (Each,      [opr1fun1]),
+        (StarDia,   [opr2fun1]),
         (Slash,     [opr1fun1]),
         (Dot,       [opr2fun2])  (* MEMO: back to opr2fun2 *)
        ]

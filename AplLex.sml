@@ -54,6 +54,8 @@ datatype token =
        | Double of string
        | Dollar
        | Underscore
+       | StarDia
+       | TildeDia
 
 fun pr_token t =
     case t of
@@ -131,6 +133,8 @@ fun pr_token t =
        | Double r => r
        | Dollar => "Dollar"
        | Underscore => "Underscore"
+       | StarDia => "StarDia"
+       | TildeDia => "TildeDia"
 
 type filename = Region.filename
 type loc = Region.loc
@@ -154,6 +158,8 @@ fun lexWord w =
       | 0wx2373 => SOME Iota
       | 0wx2375 => SOME Omega
       | 0wx2374 => SOME Rho
+      | 0wx2363 => SOME StarDia
+      | 0wx2368 => SOME TildeDia
       | 0wxAF => SOME Macron
       | 0wx236C => SOME Zilde
       | 0wxA8 => SOME Each

@@ -9,7 +9,7 @@ test: $(FILES) test.mlb test.sml Makefile
 	$(MLCOMP) -output test test.mlb
 
 TESTFILES=test.apl test1.apl test2.apl test3.apl test4.apl test5.apl \
-          sierpinski.apl mult.apl primes.apl
+          sierpinski.apl mult.apl primes.apl prelude.apl
 .PHONY: tests
 tests: test Makefile
 	@$(foreach tf,$(TESTFILES), echo "\n[Processing $(tf)]"; ./test tests/$(tf);)

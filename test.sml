@@ -13,16 +13,21 @@ val f =
     | _ => (prln("Usage: " ^ CommandLine.name() ^ " file.apl");
             OS.Process.exit OS.Process.failure)
 
+val () = prln("[Reading file " ^ f ^ "...]")
 val c = rFile f
-val ts = AplLex.lex f c
 
-val () = prln("File " ^ f ^ " lexed:")
+val () = prln("[Lexing...]")
+val ts = AplLex.lex f c
+val () = prln("[File " ^ f ^ " lexed:]")
 val () = prln(" " ^ AplLex.pr_tokens (map #1 ts))
 
-val () = prln "Parsing tokens..."
-val () = case AplParse.parse AplParse.env0 ts of
-           SOME (e,_) => (prln("Success:\n " ^ AplAst.pr_exp e);
-                          OS.Process.exit OS.Process.success)
-         | NONE => (prln "Parse error.";
-                    OS.Process.exit OS.Process.failure)
+val () = prln "[Parsing...]"
+
+val () =
+    let val (e,_) = AplParse.parse AplParse.env0 ts
+    in prln("Success:\n " ^ AplAst.pr_exp e)
+     ; OS.Process.exit OS.Process.success
+    end handle AplParse.ParseErr (l,msg) =>
+               (prln ("Parse error at " ^ Region.ppLoc l ^ ":\n  " ^ msg);
+                OS.Process.exit OS.Process.failure)
                     

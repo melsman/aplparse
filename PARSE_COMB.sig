@@ -1,7 +1,9 @@
 (** Simple parser combinator library that keeps track of position information. *)
 signature PARSE_COMB = sig
   type token
-  type 'a p = (token*Region.reg)list -> ('a * Region.reg * (token*Region.reg)list) option
+  datatype ('a,'b) either = OK of 'a | NO of 'b
+  type locerr = Region.loc * (unit -> string)
+  type 'a p = (token*Region.reg)list -> ('a * Region.reg * (token*Region.reg)list, locerr) either
     
   val >>> : 'a p * 'b p -> ('a*'b)p
   val ->> : unit p * 'b p -> 'b p
@@ -12,7 +14,6 @@ signature PARSE_COMB = sig
   val oo  : 'a p * ('a -> 'b) -> 'b p
   val ign : 'a p -> unit p
   val eat : token -> unit p
-  val err : string -> 'a p -> 'a p
   val oor : 'a p * ('a*Region.reg -> 'b) -> 'b p
 end
 

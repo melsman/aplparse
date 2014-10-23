@@ -3,6 +3,7 @@ signature REGION = sig
   type loc = int * int * filename
   type reg = loc * loc
 
+  val botloc  : loc
   val loc0    : filename -> loc (* line 1, char 1 *)
   val newline : loc -> loc
   val next    : loc -> loc

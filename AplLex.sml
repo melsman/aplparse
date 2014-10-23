@@ -56,6 +56,7 @@ datatype token =
        | Underscore
        | StarDia
        | TildeDia
+       | Pipe
 
 fun pr_token t =
     case t of
@@ -135,6 +136,7 @@ fun pr_token t =
        | Underscore => "Underscore"
        | StarDia => "StarDia"
        | TildeDia => "TildeDia"
+       | Pipe => "Pipe"
 
 type filename = Region.filename
 type loc = Region.loc
@@ -226,6 +228,7 @@ fun lexWord w =
         | SOME #";" => SOME Semicolon
         | SOME #"$" => SOME Dollar
         | SOME #"_" => SOME Underscore
+        | SOME #"|" => SOME Pipe
         | SOME c =>
           if Char.isDigit c then SOME(Digit c)
           else if Char.isAlpha c then SOME(Letter c)

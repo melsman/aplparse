@@ -6,7 +6,8 @@ fun debug f =
     else ()
 
 open AplAst
-structure PComb = ParseComb(type token=token)
+structure PComb = ParseComb(type token=token 
+                            val pr_token = AplLex.pr_token)
 
 open PComb infix >>> ->> >>- ?? ??? || oo oor
 
@@ -14,17 +15,17 @@ fun p_ws ts = (eat L.Newline ?? p_ws) #1 ts
 
 val p_sep = p_ws || eat L.Diamond
 
-fun p_id nil = NONE
-  | p_id ((L.Id id,r)::ts) = SOME(id,r,ts)
-  | p_id _ = NONE
+fun p_id nil = NO (Region.botloc,fn () => "expecting identifier but found end-of-file")
+  | p_id ((L.Id id,r)::ts) = OK(id,r,ts)
+  | p_id ((t,r)::_) = NO (#1 r,fn() => ("expecting integer but found token " ^ AplLex.pr_token t))
 
-fun p_double nil = NONE
-  | p_double ((L.Double d,r)::ts) = SOME(d,r,ts)
-  | p_double _ = NONE
+fun p_double nil = NO (Region.botloc,fn () => "expecting double but found end-of-file")
+  | p_double ((L.Double d,r)::ts) = OK(d,r,ts)
+  | p_double ((t,r)::_) = NO (#1 r, fn() => ("expecting double but found token " ^ AplLex.pr_token t))
 
-fun p_int nil = NONE
-  | p_int ((L.Int i,r)::ts) = SOME(i,r,ts)
-  | p_int _ = NONE
+fun p_int nil = NO (Region.botloc,fn () => "expecting integer but found end-of-file")
+  | p_int ((L.Int i,r)::ts) = OK(i,r,ts)
+  | p_int ((t,r)::_) = NO (#1 r, fn() => ("expecting integer but found token " ^ AplLex.pr_token t))
 
 fun is_symb t =
     case t of
@@ -39,6 +40,7 @@ fun is_symb t =
     | L.Enclose => true
     | L.Disclose => true
     | L.Slash => true
+    | L.Slashbar => true
     | L.Gradeup => true
     | L.Gradedown => true
     | L.Each => true
@@ -73,10 +75,17 @@ fun is_symb t =
     | L.Intersect => true
     | L.Union => true
     | L.StarDia => true
+    | L.Ring => true
+    | L.Pipe => true
+    | L.In => true
     | _ => false
 
-fun p_symb nil = NONE
-  | p_symb ((t,r)::ts) = if is_symb t then SOME(t,r,ts) else NONE
+fun p_symb nil = NO (Region.botloc,fn()=>"reached end-of-file")
+  | p_symb ((t,r)::ts) = 
+    if is_symb t then OK(t,r,ts) 
+    else NO (#1 r,
+             fn () => ("expecting symbol but found token " ^ 
+                       AplLex.pr_token t))
 
 (* APL Parsing *)
 
@@ -152,10 +161,11 @@ and p_indexable ts =
 
 fun parse0 ts =
     case p_body ts of
-      SOME(ast,r,ts) => 
-      (case ts of nil => SOME ast
-                | _ => NONE)
-    | NONE => NONE
+      OK(ast,r,ts) => 
+      (case ts of nil => OK ast
+                | ((t,r)::_) => NO (#1 r, fn() => ("token " ^ AplLex.pr_token t 
+                                                   ^ " not expected")))
+    | NO l => NO l
 
 fun resolve_vectors es =
     let
@@ -296,7 +306,7 @@ val lamb_env =
         (Symb Omegaomega, [value,fun1,fun2])]
     end
 
-(* Here is an example of resolution:
+(* Here is an example resolution:
 
  x1 x2  x3  f1(x4) : f1(x5) v(x6)
  x1 x2  1o2(x3) :  f1(x4) v(app1E(x5,x6))
@@ -412,19 +422,22 @@ and res0 r gs =
                            ("dyadic operator not yet supported for e2: " ^ pr_exp e2 ^ "; e1: " ^ pr_exp e1)
       in if isOpr2 s3 then                                     (* ... o2 f a *)
            case resFun gs of
-             SOME((e4,s4)::gs) =>
-             res0 r ((e1,s1)::appOpr2((e3,s3),e4,e2)::gs)
-           | SOME nil => raise Fail "res0: expecting argument to dyadic operator"
-           | NONE => raise Fail "res0: expecting function argument to dyadic operator"
-         else
-           if isFun2 s2 andalso isVal s1 andalso isVal s3 then
-             res0 r (app2(e2,e3,e1)::gs)        (* ... b f2 a ==> ... f2(a,b) *)
-           else if isOpr2 s2 then
-             if not(isOpr s1) andalso not(isOpr s3) then
-               res0 r (appOpr2((e2,s2),e3,e1)::gs)
-             else
-               raise Fail "res0: operators cannot take operators as arguments"
-           else cont()
+               SOME((e4,s4)::gs) => res0 r ((e1,s1)::appOpr2((e3,s3),e4,e2)::gs)
+             | _ => case gs of
+                        (e4,s4)::gs => res0 r ((e1,s1)::appOpr2((e3,s3),e4,e2)::gs)
+                      | nil => raise Fail "res0: expecting argument to dyadic operator"
+(*
+         else if isOpr1 s3 then
+           res0 r ((e1,s1)::appOpr1((e3,s3),e2)::gs)
+*)
+         else if isFun2 s2 andalso isVal s1 andalso isVal s3 then
+           res0 r (app2(e2,e3,e1)::gs)        (* ... b f2 a ==> ... f2(a,b) *)
+         else if isOpr2 s2 then
+           if not(isOpr s1) andalso not(isOpr s3) then
+             res0 r (appOpr2((e2,s2),e3,e1)::gs)
+           else
+             raise Fail "res0: operators cannot take operators as arguments"
+         else cont()
       end
 and resFun gs =
     case gs of
@@ -463,6 +476,8 @@ val env0 =
         (Rot,       [fun1,fun2]),
         (Vrot,      [fun1,fun2]),
         (Cat,       [fun1,fun2]),
+        (Pipe,      [fun1,fun2]),
+        (In,        [fun1,fun2]),
         (Pow,       [fun2]),
         (Vcat,      [fun2]),
         (Lt,        [fun2]),
@@ -479,19 +494,22 @@ val env0 =
         (Nmatch,    [fun2]),
         (Intersect, [fun2]),
         (Union,     [fun2]),
-        (Each,      [opr1fun1]),
+        (Ring,      [fun2]),     (* hack to resolve Ring Dot (outer product) as an application of a dyadic operator *)
+        (Each,      [opr1fun1,opr1fun2]),
         (StarDia,   [opr2fun1]),
-        (Slash,     [opr1fun1]),
+        (Slash,     [fun2,opr1fun1]),
+        (Slashbar,  [fun2,opr1fun1]),
         (Dot,       [opr2fun2])  (* MEMO: back to opr2fun2 *)
        ]
     end
 
+exception ParseErr of Region.loc * string
 fun parse E ts =
     case parse0 ts of
-      SOME e =>
+      OK e =>
       let val () = debug (fn () => "AST is\n " ^ pr_exp e ^ "\n")
           val (e',E',_) = resolve E e
-      in SOME(e',E')
+      in (e',E')
       end
-    | NONE => NONE
+    | NO (l,f) => raise ParseErr (l,f())
 end

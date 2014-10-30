@@ -17,7 +17,11 @@ val p_sep = p_ws || eat L.Diamond
 
 fun p_id nil = NO (Region.botloc,fn () => "expecting identifier but found end-of-file")
   | p_id ((L.Id id,r)::ts) = OK(id,r,ts)
-  | p_id ((t,r)::_) = NO (#1 r,fn() => ("expecting integer but found token " ^ AplLex.pr_token t))
+  | p_id ((t,r)::_) = NO (#1 r,fn() => ("expecting identifier but found token " ^ AplLex.pr_token t))
+
+fun p_quad nil = NO (Region.botloc,fn () => "expecting Quad or identifier but found end-of-file")
+  | p_quad ((L.Quad,r)::ts) = OK("$Quad",r,ts)
+  | p_quad ((t,r)::_) = NO (#1 r,fn() => ("expecting Quad or identifier but found token " ^ AplLex.pr_token t))
 
 fun p_double nil = NO (Region.botloc,fn () => "expecting double but found end-of-file")
   | p_double ((L.Double d,r)::ts) = OK(d,r,ts)
@@ -69,6 +73,8 @@ fun is_symb t =
     | L.Drop => true
     | L.Or => true
     | L.And => true
+    | L.Nor => true
+    | L.Nand => true
     | L.Match => true
     | L.Nmatch => true
     | L.Tilde => true
@@ -77,6 +83,7 @@ fun is_symb t =
     | L.StarDia => true
     | L.Ring => true
     | L.Pipe => true
+    | L.Fac => true
     | L.In => true
     | _ => false
 
@@ -137,7 +144,7 @@ and p_expr ts =
     ) ts
 
 and p_assignment ts =
-    (p_id >>- eat L.Larrow >>> p_expr oor (fn ((a,b),r) => AssignE(a,b,r))) ts
+    ( (p_id || p_quad) >>- eat L.Larrow >>> p_expr oor (fn ((a,b),r) => AssignE(a,b,r))) ts
 
 and p_seq ts =
     (p_item ?? p_seq) unres ts
@@ -463,6 +470,7 @@ val env0 =
         (Max,       [fun1,fun2]),
         (Min,       [fun1,fun2]),
         (Iota,      [fun1]),
+        (Tilde,     [fun1]),
         (Trans,     [fun1,fun2]),
         (Enclose,   [fun1]),
         (Disclose,  [fun1]),
@@ -478,6 +486,9 @@ val env0 =
         (Cat,       [fun1,fun2]),
         (Pipe,      [fun1,fun2]),
         (In,        [fun1,fun2]),
+        (Qmark,     [fun1,fun2]),
+        (Fac,       [fun1,fun2]),
+        (Circstar,  [fun1,fun2]),
         (Pow,       [fun2]),
         (Vcat,      [fun2]),
         (Lt,        [fun2]),
@@ -490,13 +501,16 @@ val env0 =
         (Drop,      [fun2]),
         (Or,        [fun2]),
         (And,       [fun2]),
+        (Nor,       [fun2]),
+        (Nand,      [fun2]),
         (Match,     [fun2]),
         (Nmatch,    [fun2]),
         (Intersect, [fun2]),
         (Union,     [fun2]),
-        (Ring,      [fun2]),     (* hack to resolve Ring Dot (outer product) as an application of a dyadic operator *)
+        (Ring,      [fun1,fun2]),     (* hack to resolve Ring Dot (outer product) as an application of a dyadic operator *)
         (Each,      [opr1fun1,opr1fun2]),
         (StarDia,   [opr2fun1]),
+        (Circ,      [opr2fun1,fun1]),
         (Slash,     [opr1fun1]),
         (Slashbar,  [opr1fun1]),
         (Dot,       [opr2fun2])  (* MEMO: back to opr2fun2 *)

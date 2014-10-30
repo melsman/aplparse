@@ -12,3 +12,11 @@ dot ← {
   TB ← ZB⍉WB⍴⍵    ⍝ Replicate, transpose
   ⍺⍺ / TA ⍵⍵ TB   ⍝ Compute the result
 }
+
+out ← {
+  A ← ⍺
+  B ← ⍵
+  X ← ((⍴⍴B)⌽⍳(⍴⍴B)+⍴⍴A) ⍉ ((⍴B),(⍴A)) ⍴ A
+  Y ← ((⍴A),(⍴B)) ⍴ B
+  X ⍺⍺ Y
+}

@@ -35,6 +35,7 @@ datatype token =
        | Circstar
        | Take | Drop
        | Or | And
+       | Nor | Nand
        | Match | Nmatch
        | Qmark
        | Ring
@@ -57,6 +58,7 @@ datatype token =
        | StarDia
        | TildeDia
        | Pipe
+       | Fac
 
 fun pr_token t =
     case t of
@@ -113,6 +115,8 @@ fun pr_token t =
        | Drop => "Drop"
        | Or => "Or"
        | And => "And"
+       | Nor => "Nor"
+       | Nand => "Nand"
        | Match => "Match"
        | Nmatch => "Nmatch"
        | Qmark => "Qmark"
@@ -137,6 +141,7 @@ fun pr_token t =
        | StarDia => "StarDia"
        | TildeDia => "TildeDia"
        | Pipe => "Pipe"
+       | Fac => "Fac"
 
 type filename = Region.filename
 type loc = Region.loc
@@ -172,10 +177,13 @@ fun lexWord w =
       | 0wx2260 => SOME Neq
       | 0wx2228 => SOME Or
       | 0wx2227 => SOME And
+      | 0wx2371 => SOME Nor
+      | 0wx2372 => SOME Nand
       | 0wxF7 => SOME Div
       | 0wxD7 => SOME Times
       | 0wx2212 => SOME Sub
       | 0wx220A => SOME In
+      | 0wx2208 => SOME In
       | 0wx2191 => SOME Take
       | 0wx2193 => SOME Drop
       | 0wx25CB => SOME Circ
@@ -229,6 +237,7 @@ fun lexWord w =
         | SOME #"$" => SOME Dollar
         | SOME #"_" => SOME Underscore
         | SOME #"|" => SOME Pipe
+        | SOME #"!" => SOME Fac
         | SOME c =>
           if Char.isDigit c then SOME(Digit c)
           else if Char.isAlpha c then SOME(Letter c)

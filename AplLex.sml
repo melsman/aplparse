@@ -166,6 +166,7 @@ fun lexWord w =
       | 0wx2375 => SOME Omega
       | 0wx2374 => SOME Rho
       | 0wx2363 => SOME StarDia
+      | 0wx22C6 => SOME Pow
       | 0wx2368 => SOME TildeDia
       | 0wxAF => SOME Macron
       | 0wx236C => SOME Zilde

@@ -2,4 +2,4 @@ description: An APL parser in Standard ML
 maintainer: Martin Elsman <mael@di.ku.dk>
 keywords: APL, parsing
 license: MIT License
-requires: unicode v1 (v1.0.1)
+requires: unicode v1 (v1.0.4)

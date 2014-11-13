@@ -489,7 +489,7 @@ val env0 =
         (Qmark,     [fun1,fun2]),
         (Fac,       [fun1,fun2]),
         (Circstar,  [fun1,fun2]),
-        (Pow,       [fun2]),
+        (Pow,       [fun1,fun2]),
         (Vcat,      [fun2]),
         (Lt,        [fun2]),
         (Gt,        [fun2]),

@@ -174,32 +174,6 @@ fun parse0 ts =
                                                    ^ " not expected")))
     | NO l => NO l
 
-fun resolve_vectors es =
-    let
-      fun immed (DoubleE _) = true
-        | immed (IntE _) = true
-        | immed _ = false
-
-      fun vec [e] = e
-        | vec nil = raise Fail "resolve_vectors.vec"
-        | vec (e::es) = 
-          let val r = reg_exps (reg_exp e) es
-          in VecE(e::es,r)
-          end
-      
-      val (es,opt) =
-            foldl (fn (e, (es,NONE)) => if immed e then (es,SOME[e])
-                                        else (e::es,NONE)
-                    | (e, (es,SOME immeds)) =>
-                      if immed e then (es,SOME(e::immeds))
-                      else (e :: vec(rev immeds) :: es,NONE))
-                  (nil,NONE) es
-        val es = case opt of
-                   SOME immeds => vec(rev immeds) :: es
-                 | NONE => es
-    in rev es
-    end
-
 structure Class = struct
 
 (* Operators may take functions or arrays as arguments.
@@ -270,6 +244,30 @@ fun pOpr2 c = c=opr2fun1 orelse c=opr2fun2
 fun appopr (_,n) = (0,n)
 
 end
+
+(* Utility function for resolving vectors in sequences of symbols and
+ * immediate values *)
+fun resolve_vectors gs =
+    let fun vec [(e,s)] = (e,s)
+          | vec nil = raise Fail "resolve_vectors.vec"
+          | vec ((e,s)::gs) = 
+            let val es = List.map #1 gs
+                val r = reg_exps (reg_exp e) es
+            in (VecE(e::es,r),s)
+            end
+        fun isValue (e,s) = s = [Class.value]
+        val (gs,opt) =
+            foldl (fn (g, (gs,NONE)) => if isValue g then (gs,SOME[g])
+                                        else (g::gs,NONE)
+                    | (g, (gs,SOME values)) =>
+                      if isValue g then (gs,SOME(g::values))
+                      else (g :: vec(rev values) :: gs,NONE))
+                  (nil,NONE) gs
+        val gs = case opt of
+                   SOME values => vec(rev values) :: gs
+                 | NONE => gs
+    in rev gs
+    end
 
 (* Resolve and eliminate Unres nodes in the tree. The resolution is done
  * right-to-left. Each term is ascribed a specifier (a set of classes). The specifiers
@@ -380,12 +378,12 @@ fun resolve E e =
       in (IndexE(e0,rev is,r),E0@E1,valuespec)
       end
     | UnresE (es,r) =>
-      let val es = resolve_vectors es
-          val (gs, E') = foldl (fn (e,(gs,E')) => 
+      let val (gs, E') = foldl (fn (e,(gs,E')) => 
                                    let val (e,E'',s) = resolve (E'@E) e
                                    in ((e,s)::gs,E''@E')
                                    end) (nil,emp) (rev es)
-          val (e,s) = res0 r (rev gs)                         
+          val gs = resolve_vectors gs
+          val (e,s) = res0 r (rev gs)
       in (e,E',s)
       end
 and appOpr1((e1,s1),e2) =

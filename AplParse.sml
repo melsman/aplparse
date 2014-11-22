@@ -31,6 +31,10 @@ fun p_int nil = NO (Region.botloc,fn () => "expecting integer but found end-of-f
   | p_int ((L.Int i,r)::ts) = OK(i,r,ts)
   | p_int ((t,r)::_) = NO (#1 r, fn() => ("expecting integer but found token " ^ AplLex.pr_token t))
 
+fun p_string nil = NO (Region.botloc,fn () => "expecting string but found end-of-file")
+  | p_string ((L.Chars ws,r)::ts) = OK(ws,r,ts)
+  | p_string ((t,r)::_) = NO (#1 r, fn() => ("expecting string but found token " ^ AplLex.pr_token t))
+
 fun is_symb t =
     case t of
       L.Alpha => true
@@ -160,6 +164,7 @@ and p_indices ts =
 and p_indexable ts =
     (  (p_int oor IntE)
     || (p_double oor DoubleE)
+    || (p_string oor StrE)
     || (p_symb oor (fn (a,r) => IdE(Symb a,r)))
     || (p_id oor (fn (a,r) => IdE(Var a,r)))
     || ((eat L.Lpar ->> p_expr >>- eat L.Rpar) oor ParE)

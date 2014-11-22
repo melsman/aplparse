@@ -10,7 +10,7 @@ structure AplAst = struct
   datatype exp =
            IntE of string * reg
          | DoubleE of string * reg
-         | StrE of string * reg
+         | StrE of word list * reg
          | VecE of exp list * reg
          | IdE of id * reg
          | LambE of (int*int) * exp * reg         (* ints specify valence of operator and derived function *)
@@ -34,7 +34,7 @@ structure AplAst = struct
       case e of
         IntE (s,_) => s
       | DoubleE (s,_) => s
-      | StrE (s,_) => "\"" ^ String.toString s ^ "\""
+      | StrE (ws,_) => L.pr_chars ws
       | VecE (es,_) => "Vec[" ^ pr_exps es ^ "]"
       | IdE (id,_) => pr_id id
       | LambE ((v1,v2),e,_) => "Lam[" ^ pr_ints[v1,v2] ^ "](" ^ pr_exp e ^ ")"

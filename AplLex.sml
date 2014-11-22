@@ -10,6 +10,7 @@ datatype token =
        | Quad
        | Quaddiv
        | Quotquad
+       | Quot
        | Max | Min
        | Enclose | Disclose
        | Slash | Backslash
@@ -53,12 +54,18 @@ datatype token =
        | Id of string
        | Int of string
        | Double of string
+       | Chars of word list
        | Dollar
        | Underscore
        | StarDia
        | TildeDia
        | Pipe
        | Fac
+
+fun pr_chars ws =
+    if List.all (fn w => w < 0w128) ws then
+      "'" ^ implode (List.map (Char.chr o Word.toInt) ws) ^ "'"
+    else "Chars(" ^ String.concatWith "," (List.map Word.toString ws) ^ ")"
 
 fun pr_token t =
     case t of
@@ -71,6 +78,7 @@ fun pr_token t =
        | Quad => "Quad"
        | Quaddiv => "Quaddiv"
        | Quotquad => "Quotquad"
+       | Quot => "Quot"
        | Max => "Max"
        | Min => "Min"
        | Enclose => "Enclose"
@@ -136,6 +144,7 @@ fun pr_token t =
        | Id s => "Id(" ^ s ^ ")"
        | Int i => i
        | Double r => r
+       | Chars ws => pr_chars ws
        | Dollar => "Dollar"
        | Underscore => "Underscore"
        | StarDia => "StarDia"
@@ -153,6 +162,7 @@ datatype state = CommentS
                | SymbS of token * loc * loc   (* for lexing Alphaalpha and Omegaomega *)
                | IntS of string * loc * loc
                | DoubleS of string * loc * loc
+               | CharsS of word list * loc * loc
                | IdS of string * loc * loc
 
 fun getChar w =
@@ -239,6 +249,7 @@ fun lexWord w =
         | SOME #"_" => SOME Underscore
         | SOME #"|" => SOME Pipe
         | SOME #"!" => SOME Fac
+        | SOME #"'" => SOME Quot
         | SOME c =>
           if Char.isDigit c then SOME(Digit c)
           else if Char.isAlpha c then SOME(Letter c)
@@ -288,6 +299,9 @@ fun process0 (w,(tokens,state,loc)) =
                | NONE => lexError loc ("ilformed double " ^ s))
             | (IdS(s,l0,l1),  _)                 => process'((Id s,(l0,l1))::tokens, StartS, loc)
             | (StartS,        SOME Comment)      => (tokens,CommentS, Region.next loc)
+            | (StartS,        SOME Quot)         => (tokens,CharsS(nil,loc,loc), Region.next loc)
+            | (CharsS(ws,l0,l1),SOME Quot)       => ((Chars(rev ws),(l0,loc))::tokens, StartS, Region.next loc)
+            | (CharsS(ws,l0,l1), _)              => (tokens,CharsS(w::ws,l0,loc), Region.next loc)
             | (StartS,        SOME s)            => ((s,(loc,loc))::tokens,StartS,
                                                      if s = Newline then Region.newline loc
                                                      else Region.next loc)

@@ -513,7 +513,7 @@ val env0 =
         (Ring,      [fun1,fun2]),     (* hack to resolve Ring Dot (outer product) as an application of a dyadic operator *)
         (Each,      [opr1fun1,opr1fun2]),
         (StarDia,   [opr2fun1]),
-        (Circ,      [opr2fun1,fun1]),
+        (Circ,      [fun1,fun2]),
         (Slash,     [opr1fun1]),
         (Slashbar,  [opr1fun1]),
         (Dot,       [opr2fun2])  (* MEMO: back to opr2fun2 *)

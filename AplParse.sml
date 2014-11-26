@@ -529,4 +529,7 @@ fun parse E ts =
       in (e',E')
       end
     | NO (l,f) => raise ParseErr (l,f())
+
+open Class
+fun add (id,l) e = (Var id, l) :: e 
 end

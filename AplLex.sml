@@ -159,7 +159,7 @@ fun loc0 f : loc = (1,1,f) (* line 1, char 1 *)
 
 datatype state = CommentS
                | StartS
-               | SymbS of token * loc * loc   (* for lexing Alphaalpha and Omegaomega *)
+               | SymbS of token * loc * loc   (* for lexing Alphaalpha, Omegaomega, Quad-Id *)
                | IntS of string * loc * loc
                | DoubleS of string * loc * loc
                | CharsS of word list * loc * loc
@@ -286,8 +286,10 @@ fun process0 (w,(tokens,state,loc)) =
             | (IdS(s,l0,_),   SOME (Digit c))    => (tokens, IdS(s ^ String.str c,l0,loc), Region.next loc)
             | (StartS,        SOME Alpha)        => (tokens, SymbS(Alpha,loc,loc), Region.next loc)
             | (StartS,        SOME Omega)        => (tokens, SymbS(Omega,loc,loc), Region.next loc)
+            | (StartS,        SOME Quad)         => (tokens, SymbS(Quad,loc,loc), Region.next loc)
             | (SymbS(Alpha,l0,_), SOME Alpha)    => ((Alphaalpha,(l0,loc))::tokens, StartS, Region.next loc)
             | (SymbS(Omega,l0,_), SOME Omega)    => ((Omegaomega,(l0,loc))::tokens, StartS, Region.next loc)
+            | (SymbS(Quad,l0,_), SOME (Letter c)) => (tokens, IdS("Quad$" ^ String.str c,l0,loc), Region.next loc)
             | (SymbS(t,l0,l1), _)                => process'((t,(l0,l1))::tokens, StartS, loc)
             | (IntS(s,l0,l1), _)                 =>
               (case Int.fromString s of

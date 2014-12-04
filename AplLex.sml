@@ -155,7 +155,7 @@ fun pr_token t =
 type filename = Region.filename
 type loc = Region.loc
 type reg = Region.reg
-fun loc0 f : loc = (1,1,f) (* line 1, char 1 *)
+fun loc0 f : loc = (1,0,f) (* line 1, char 0 *)
 
 datatype state = CommentS
                | StartS
@@ -283,6 +283,7 @@ fun process0 (w,(tokens,state,loc)) =
             | (StartS,        SOME Dollar)       => (tokens, IdS("$",loc,loc), Region.next loc)
             | (StartS,        SOME Underscore)   => (tokens, IdS("_",loc,loc), Region.next loc)
             | (IdS(s,l0,_),   SOME (Letter c))   => (tokens, IdS(s ^ String.str c,l0,loc), Region.next loc)
+            | (IdS(s,l0,_),   SOME Underscore)   => (tokens, IdS(s ^ "_",l0,loc), Region.next loc)
             | (IdS(s,l0,_),   SOME (Digit c))    => (tokens, IdS(s ^ String.str c,l0,loc), Region.next loc)
             | (StartS,        SOME Alpha)        => (tokens, SymbS(Alpha,loc,loc), Region.next loc)
             | (StartS,        SOME Omega)        => (tokens, SymbS(Omega,loc,loc), Region.next loc)

@@ -46,16 +46,17 @@ structure AplAst = struct
       | SeqE (es,_) => "[" ^ pr_exps es ^ "]"
       | ParE (e,_) => "Par(" ^ pr_exp e ^ ")"
       | GuardE (e1,e2,_) => "Guard(" ^ pr_exp e1 ^ "," ^ pr_exp e2 ^ ")"
-      | IndexE (e,is,_) => "Index(" ^ pr_exp e ^ "," ^ pr_indices is ^ ")"
+      | IndexE (e,is,_) => "Index(" ^ pr_exp e ^ ",[" ^ pr_indices is ^ "])"
       | UnresE (es,_) => "Unres[" ^ pr_exps es ^ "]"
                      
   and pr_exps nil = ""
     | pr_exps [e] = pr_exp e
     | pr_exps (e::es) = pr_exp e ^ "," ^ pr_exps es
+
+  and pr_optexp NONE = ""
+    | pr_optexp (SOME e) = pr_exp e
                         
-  and pr_indices nil = ""
-    | pr_indices (NONE::is) = "; " ^ pr_indices is
-    | pr_indices (SOME e :: is) = pr_exp e ^ pr_indices is
+  and pr_indices idxs = String.concatWith ";" (List.map pr_optexp idxs)
 
   fun reg_exp e =
       case e of

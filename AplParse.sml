@@ -157,8 +157,8 @@ and p_item ts =
     (p_indexable ??? (eat L.Lsqbra ->> p_indices >>- eat L.Rsqbra)) IndexE ts
 
 and p_indices ts =
-    (  (p_expr oo (fn x => [SOME x]) ?? (eat L.Semicolon ->> p_indices)) (op @)
-    || (eat L.Semicolon oo (fn () => [NONE]))
+    (  (p_expr oo (fn x => [SOME x]) ?? ((eat L.Semicolon ->> p_indices) || (eat L.Semicolon oo (fn() => [NONE])))) (op @)
+    || (eat L.Semicolon oo (fn () => [NONE]) ?? p_indices) (op @)
     ) ts
 
 and p_indexable ts =

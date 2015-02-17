@@ -492,7 +492,7 @@ val env0 =
         (Tilde,     [fun1]),
         (Trans,     [fun1,fun2]),
         (Enclose,   [fun1]),
-        (Disclose,  [fun1]),
+        (Disclose,  [fun1,fun2]),
         (Gradeup,   [fun1]),
         (Gradedown, [fun1]),
         (Add,       [fun1,fun2]),

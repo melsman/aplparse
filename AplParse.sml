@@ -11,30 +11,40 @@ structure PComb = ParseComb(type token=token
 
 open PComb infix >>> ->> >>- ?? ??? || oo oor
 
+(* eat Newline's from the list of tokens *)
+(* p_ws : unit p  *)
 fun p_ws ts = (eat L.Newline ?? p_ws) #1 ts
 
+(* Seperators: either whitespace or a Diamond *)
+(* p_sep : unit p *)
 val p_sep = p_ws || eat L.Diamond
 
+(* p_id : string p *)
 fun p_id nil = NO (Region.botloc,fn () => "expecting identifier but found end-of-file")
   | p_id ((L.Id id,r)::ts) = OK(id,r,ts)
   | p_id ((t,r)::_) = NO (#1 r,fn() => ("expecting identifier but found token " ^ AplLex.pr_token t))
 
+(* p_quad : string p *)
 fun p_quad nil = NO (Region.botloc,fn () => "expecting Quad or identifier but found end-of-file")
   | p_quad ((L.Quad,r)::ts) = OK("$Quad",r,ts)
   | p_quad ((t,r)::_) = NO (#1 r,fn() => ("expecting Quad or identifier but found token " ^ AplLex.pr_token t))
 
+(* p_double : double p *)
 fun p_double nil = NO (Region.botloc,fn () => "expecting double but found end-of-file")
   | p_double ((L.Double d,r)::ts) = OK(d,r,ts)
   | p_double ((t,r)::_) = NO (#1 r, fn() => ("expecting double but found token " ^ AplLex.pr_token t))
 
+(* p_int : int p *)
 fun p_int nil = NO (Region.botloc,fn () => "expecting integer but found end-of-file")
   | p_int ((L.Int i,r)::ts) = OK(i,r,ts)
   | p_int ((t,r)::_) = NO (#1 r, fn() => ("expecting integer but found token " ^ AplLex.pr_token t))
 
+(* p_string : word list p *)
 fun p_string nil = NO (Region.botloc,fn () => "expecting string but found end-of-file")
   | p_string ((L.Chars ws,r)::ts) = OK(ws,r,ts)
   | p_string ((t,r)::_) = NO (#1 r, fn() => ("expecting string but found token " ^ AplLex.pr_token t))
 
+(* is_symb : Lexer.token -> bool *)
 fun is_symb t =
     case t of
       L.Alpha => true
@@ -49,6 +59,7 @@ fun is_symb t =
     | L.Disclose => true
     | L.Slash => true
     | L.Slashbar => true
+    | L.Backslash => true
     | L.Gradeup => true
     | L.Gradedown => true
     | L.Each => true
@@ -91,6 +102,7 @@ fun is_symb t =
     | L.In => true
     | _ => false
 
+(* p_symb : token p *)
 fun p_symb nil = NO (Region.botloc,fn()=>"reached end-of-file")
   | p_symb ((t,r)::ts) = 
     if is_symb t then OK(t,r,ts) 
@@ -125,16 +137,19 @@ fun p_symb nil = NO (Region.botloc,fn()=>"reached end-of-file")
                | ( expr ) | { body }
 *)
 
+(* seq : exp * exp -> exp *)
 fun seq (SeqE (es1,r1), SeqE (es2,r2)) = SeqE(es1@es2,Region.plus "seq1" r1 r2)
   | seq (SeqE (es,r), e) = SeqE(es @ [e],Region.plus "seq2" r (reg_exp e))
   | seq (e, SeqE (es,r)) = SeqE(e::es,Region.plus "seq3" (reg_exp e) r)
   | seq (e1,e2) = SeqE([e1,e2],Region.plus "seq4"(reg_exp e1)(reg_exp e2))
 
+(* unres : exp * exp -> exp *)
 fun unres (UnresE (es1,r1), UnresE (es2,r2)) = UnresE(es1@es2,Region.plus "unres1"r1 r2)
   | unres (UnresE (es,r), e) = UnresE(es @ [e],Region.plus "unres2" r (reg_exp e))
   | unres (e, UnresE (es,r)) = UnresE(e::es,Region.plus "unres3" (reg_exp e) r)
   | unres (e1,e2) = UnresE([e1,e2],Region.plus "unres4" (reg_exp e1)(reg_exp e2))
 
+(* exp parsers *)
 fun p_body ts =
     (((((p_guard ?? (p_sep ->> p_body)) seq) ?? p_ws) #1)
      || (p_sep ->> p_body)) ts
@@ -171,6 +186,7 @@ and p_indexable ts =
     || ((eat L.Lbra ->> p_body >>- eat L.Rbra) oor (fn (e,r) => LambE((~1,~1),e,r)))
     ) ts
 
+(* parse0 : (token * reg) list -> (exp, locerr) either *)
 fun parse0 ts =
     case p_body ts of
       OK(ast,r,ts) => 
@@ -516,6 +532,7 @@ val env0 =
         (Circ,      [fun1,fun2]),
         (Slash,     [opr1fun1]),
         (Slashbar,  [opr1fun1]),
+        (Backslash, [opr1fun1]),
         (Dot,       [opr2fun2])  (* MEMO: back to opr2fun2 *)
        ]
     end

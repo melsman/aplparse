@@ -62,11 +62,13 @@ datatype token =
        | Pipe
        | Fac
 
+(* pr_chars : word list -> string *)
 fun pr_chars ws =
     if List.all (fn w => w < 0w128) ws then
       "'" ^ implode (List.map (Char.chr o Word.toInt) ws) ^ "'"
     else "Chars(" ^ String.concatWith "," (List.map Word.toString ws) ^ ")"
 
+(* pr_token : token -> string *)
 fun pr_token t =
     case t of
          Alpha => "Alpha"
@@ -165,10 +167,12 @@ datatype state = CommentS
                | CharsS of word list * loc * loc
                | IdS of string * loc * loc
 
+(* getChar : word -> char option *)
 fun getChar w =
     if w < 0w128 then SOME(Char.chr(Word.toInt w))
     else NONE
 
+(* lexWord : word -> token optin *)
 fun lexWord w =
     case w of
         0wx237A => SOME Alpha
@@ -256,16 +260,21 @@ fun lexWord w =
           else NONE
         | _ => NONE
 
+(* isWhiteSpace : word -> bool *)
 fun isWhiteSpace w =
     case getChar w of
       SOME c => Char.isSpace c
     | NONE => false
 
+(* lexError : loc -> string -> 'a *)
 fun lexError loc s = 
     let val msg = "Lexical error at location " ^ Region.ppLoc loc ^ ": " ^ s
     in raise Fail msg
     end
 
+type procstate = (token * reg) list * state * loc
+
+(* process : word * procstate -> procstate *)
 fun process0 (w,(tokens,state,loc)) =
     let val elem = lexWord w
         fun process (tokens,state,loc) =
@@ -318,8 +327,10 @@ fun process0 (w,(tokens,state,loc)) =
       process(tokens,state,loc)
     end
 
+(* pr_tokens : token list -> string *)
 fun pr_tokens ts = String.concatWith " " (List.map pr_token ts)
 
+(* lex : string -> string -> (token * reg) list *)
 fun lex filename s =
     let val s = Utf8.fromString (s^" ")  (* pad some whitespace to keep the lexer happy *)
         val (tokens,state,_) = Utf8.foldl process0 (nil,StartS,Region.loc0 filename) s

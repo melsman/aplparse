@@ -22,4 +22,33 @@ end
 
 ['a p] type of parsers that parse values of type 'a.
 
+a >>> b
+    Sequence parsers a and b
+
+a ->> b
+    Sequence parsers a and b, discard result of a
+
+a >>- b
+    Sequence parsers a and b, discard result of b
+
+(a ?? b) f
+    parse a and maybe continue with b, if both succeeds, combine with f
+
+(a ??? b) f
+    same as ??, but giving region information to f
+
+a || b
+    alternatives
+
+p oo f
+    fmap f p
+
+ign p
+    discard the result of a parser p
+
+eat t ts
+    "eat" one token t from list ts
+
+p oor f
+    fmap f p, giving region info to f
 *)

@@ -18,7 +18,7 @@ structure AplAst = struct
          | App2E of exp * exp * exp * reg         (* apply dyadic function or operator *) 
          | AppOpr1E of int list * exp * exp * reg (* apply monadic operator; int list contains the possible valences of the resulting function *)
          | AppOpr2E of int list * exp * exp * exp * reg (* apply dyadic operator *)
-         | AssignE of var * exp * reg
+         | AssignE of var * exp option list * exp * reg
          | SeqE of exp list * reg
          | ParE of exp * reg
          | GuardE of exp * exp * reg
@@ -42,13 +42,16 @@ structure AplAst = struct
       | App2E (e0,e1,e2,_) => "App2(" ^ pr_exp e0 ^ "," ^ pr_exp e1 ^ "," ^ pr_exp e2 ^ ")"
       | AppOpr1E (vs,e0,e1,_) => "AppOpr1[" ^ pr_ints vs ^ "](" ^ pr_exp e0 ^ "," ^ pr_exp e1 ^ ")"
       | AppOpr2E (vs,e0,e1,e2,_) => "AppOpr2[" ^ pr_ints vs ^ "](" ^ pr_exp e0 ^ "," ^ pr_exp e1 ^ "," ^ pr_exp e2 ^ ")"
-      | AssignE (v,e,_) => "Assign(" ^ v ^ "," ^ pr_exp e ^ ")"
+      | AssignE (v,nil,e,_) => "Assign(" ^ v ^ "," ^ pr_exp e ^ ")"
+      | AssignE (v,is,e,_) => "Assign(" ^ v ^ "," ^ pr_sqindices is ^ "," ^ pr_exp e ^ ")"
       | SeqE (es,_) => "[" ^ pr_exps es ^ "]"
       | ParE (e,_) => "Par(" ^ pr_exp e ^ ")"
       | GuardE (e1,e2,_) => "Guard(" ^ pr_exp e1 ^ "," ^ pr_exp e2 ^ ")"
-      | IndexE (e,is,_) => "Index(" ^ pr_exp e ^ ",[" ^ pr_indices is ^ "])"
+      | IndexE (e,is,_) => "Index(" ^ pr_exp e ^ "," ^ pr_sqindices is ^ ")"
       | UnresE (es,_) => "Unres[" ^ pr_exps es ^ "]"
                      
+  and pr_sqindices is = "[" ^ pr_indices is ^ "]"
+
   and pr_exps nil = ""
     | pr_exps [e] = pr_exp e
     | pr_exps (e::es) = pr_exp e ^ "," ^ pr_exps es
@@ -70,7 +73,7 @@ structure AplAst = struct
       | App2E (_,_,_,r) => r
       | AppOpr1E (_,_,_,r) => r
       | AppOpr2E (_,_,_,_,r) => r
-      | AssignE (_,_,r) => r
+      | AssignE (_,_,_,r) => r
       | SeqE (_,r) => r
       | ParE (_,r) => r
       | GuardE (_,_,r) => r

@@ -124,7 +124,7 @@ fun p_symb nil = NO (Region.botloc,fn()=>"reached end-of-file")
    expr ::= assignment
           | seq <assignment>
 
-   assignment ::= ID LARROW expr
+   assignment ::= ID < [ indices ] > LARROW expr
 
    seq ::= item < seq >
 
@@ -163,13 +163,17 @@ and p_expr ts =
     ) ts
 
 and p_assignment ts =
-    ( (p_id || p_quad) >>- eat L.Larrow >>> p_expr oor (fn ((a,b),r) => AssignE(a,b,r))) ts
+    ( ((((p_id || p_quad) oo (fn x => (x,nil))) ?? p_sqindices) (fn ((x,_),xs) => (x,xs))) >>- 
+      eat L.Larrow >>> p_expr oor (fn (((x,xs),b),r) => AssignE(x,xs,b,r)) ) ts
 
 and p_seq ts =
     (p_item ?? p_seq) unres ts
 
+and p_sqindices ts = 
+    (eat L.Lsqbra ->> p_indices >>- eat L.Rsqbra) ts
+
 and p_item ts =
-    (p_indexable ??? (eat L.Lsqbra ->> p_indices >>- eat L.Rsqbra)) IndexE ts
+    (p_indexable ??? p_sqindices) IndexE ts
 
 and p_indices ts =
     (  (p_expr oo (fn x => [SOME x]) ?? ((eat L.Semicolon ->> p_indices) || (eat L.Semicolon oo (fn() => [NONE])))) (op @)
@@ -238,7 +242,9 @@ fun classify e : class =
     | App2E (e0,e1,e2,_) => lub (classify e0) (lub (classify e1) (classify e2))
     | AppOpr1E (_,e0,e1,_) => lub (classify e0) (classify e1)
     | AppOpr2E (_,e0,e1,e2,_) => lub (classify e0) (lub (classify e1) (classify e2))
-    | AssignE (v,e,_) => classify e
+    | AssignE (v,is,e,_) => 
+      foldl(fn (NONE, a) => a
+             | (SOME e, a) => lub a (classify e)) (classify e) is
     | SeqE(es,_) => foldl (fn (e,a) => lub a (classify e)) bot es
     | ParE(e,_) => classify e
     | GuardE (e1,e2,_) => lub (classify e1) (classify e2)
@@ -365,10 +371,16 @@ fun resolve E e =
     | App2E _ => raise Fail "resolve:App1"
     | AppOpr1E _ => raise Fail "resolve:App1"
     | AppOpr2E _ => raise Fail "resolve:App1"
-    | AssignE (v,e,r) =>
-      let val (e,E,s) = resolve E e
+    | AssignE (v,is,e,r) =>
+      let val (e,E',s) = resolve E e
+          val (is,E1) =
+              foldl (fn (NONE, (is,E0)) => (NONE::is,E0)
+                      | (SOME i, (is, E0)) => 
+                        let val (i,E2,_) = resolve (E0@E'@E) i  (* memo: maybe check for valuespec *)
+                        in (SOME i::is,E2@E0)
+                        end) (nil,emp) is
           val E' = [(Var v,s)]
-      in (AssignE(v,e,r),E',s)
+      in (AssignE(v,rev is,e,r),E',s)
       end
     | SeqE (es,r) => 
       let val (es,E,s) =

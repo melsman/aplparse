@@ -2,6 +2,16 @@ structure AplLex = struct
 
 datatype token =
          Alpha
+       | Beta
+       | Gamma
+       | Delta
+       | Epsilon
+       | Zeta
+       | Eta
+       | Kappa
+       | Lambda
+       | Mu
+       | Nu
        | Omega
        | Alphaalpha
        | Omegaomega
@@ -15,6 +25,7 @@ datatype token =
        | Enclose | Disclose
        | Slash | Backslash
        | Slashbar | Backslashbar
+       | Squad
        | Gradeup | Gradedown
        | Each
        | Add
@@ -61,6 +72,7 @@ datatype token =
        | TildeDia
        | Pipe
        | Fac
+       | Thorn
 
 (* pr_chars : word list -> string *)
 fun pr_chars ws =
@@ -72,6 +84,16 @@ fun pr_chars ws =
 fun pr_token t =
     case t of
          Alpha => "Alpha"
+       | Beta => "Beta"
+       | Gamma => "Gamma"
+       | Delta => "Delta"
+       | Epsilon => "Epsilon"
+       | Zeta => "Zeta"
+       | Eta => "Eta"
+       | Kappa => "Kappa"
+       | Lambda => "Lambda"
+       | Mu => "Mu"
+       | Nu => "Nu"
        | Omega => "Omega"
        | Alphaalpha => "Alphaalpha"
        | Omegaomega => "Omegaomega"
@@ -89,6 +111,7 @@ fun pr_token t =
        | Backslash => "Backslash"
        | Slashbar => "Slashbar"
        | Backslashbar => "Backslashbar"
+       | Squad => "Squad"
        | Gradeup => "Gradeup"
        | Gradedown => "Gradedown"
        | Each => "Each"
@@ -153,6 +176,7 @@ fun pr_token t =
        | TildeDia => "TildeDia"
        | Pipe => "Pipe"
        | Fac => "Fac"
+       | Thorn => "Thorn"
 
 type filename = Region.filename
 type loc = Region.loc
@@ -176,6 +200,16 @@ fun getChar w =
 fun lexWord w =
     case w of
         0wx237A => SOME Alpha
+      | 0wx03B2 => SOME Beta
+      | 0wx03B3 => SOME Gamma
+      | 0wx03B4 => SOME Delta
+      | 0wx03B5 => SOME Epsilon
+      | 0wx03B6 => SOME Zeta
+      | 0wx03B7 => SOME Eta
+      | 0wx03BA => SOME Kappa
+      | 0wx03BB => SOME Lambda
+      | 0wx03BC => SOME Mu
+      | 0wx03BD => SOME Nu
       | 0wx2373 => SOME Iota
       | 0wx2375 => SOME Omega
       | 0wx2374 => SOME Rho
@@ -187,6 +221,7 @@ fun lexWord w =
       | 0wxA8 => SOME Each
       | 0wx233F => SOME Slashbar
       | 0wx2340 => SOME Backslashbar
+      | 0wx2337 => SOME Squad
       | 0wx2264 => SOME Lteq
       | 0wx2265 => SOME Gteq
       | 0wx2260 => SOME Neq
@@ -226,6 +261,7 @@ fun lexWord w =
       | 0wx235D => SOME Comment
       | 0wx2395 => SOME Quad
       | 0wx235E => SOME Quotquad
+      | 0wx2355 => SOME Thorn
       | _ =>
         case getChar w of
           SOME #"{" => SOME Lbra

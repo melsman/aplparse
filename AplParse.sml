@@ -60,6 +60,7 @@ fun is_symb t =
     | L.Slash => true
     | L.Slashbar => true
     | L.Backslash => true
+    | L.Squad => true
     | L.Gradeup => true
     | L.Gradedown => true
     | L.Each => true
@@ -100,6 +101,7 @@ fun is_symb t =
     | L.Pipe => true
     | L.Fac => true
     | L.In => true
+    | L.Thorn => true
     | _ => false
 
 (* p_symb : token p *)
@@ -545,6 +547,8 @@ val env0 =
         (Slash,     [opr1fun1]),
         (Slashbar,  [opr1fun1]),
         (Backslash, [opr1fun1]),
+        (Squad,     [fun1]),
+        (Thorn,     [fun1,fun2]),
         (Dot,       [opr2fun2])  (* MEMO: back to opr2fun2 *)
        ]
     end

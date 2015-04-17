@@ -11,14 +11,6 @@ structure PComb = ParseComb(type token=token
 
 open PComb infix >>> ->> >>- ?? ??? || oo oor
 
-(* eat Newline's from the list of tokens *)
-(* p_ws : unit p  *)
-fun p_ws ts = (eat L.Newline ?? p_ws) #1 ts
-
-(* Seperators: either whitespace or a Diamond *)
-(* p_sep : unit p *)
-val p_sep = p_ws || eat L.Diamond
-
 (* p_id : string p *)
 fun p_id nil = NO (Region.botloc,fn () => "expecting identifier but found end-of-file")
   | p_id ((L.Id id,r)::ts) = OK(id,r,ts)
@@ -43,6 +35,22 @@ fun p_int nil = NO (Region.botloc,fn () => "expecting integer but found end-of-f
 fun p_string nil = NO (Region.botloc,fn () => "expecting string but found end-of-file")
   | p_string ((L.Chars ws,r)::ts) = OK(ws,r,ts)
   | p_string ((t,r)::_) = NO (#1 r, fn() => ("expecting string but found token " ^ AplLex.pr_token t))
+
+(* p_comment : token list p *)
+fun p_comment nil = NO (Region.botloc,fn () => "expecting comment but found end-of-file")
+  | p_comment ((L.Comment ts1,r)::ts2) = OK((), r, ts2)
+  | p_comment ((t,r)::_) = NO (#1 r, fn() => ("expecting comment but found token " ^ AplLex.pr_token t))
+
+
+fun p_commentsOrWhitespace ts = ((eat L.Newline || p_comment) ?? p_commentsOrWhitespace) #1 ts
+
+(* eat Newline's from the list of tokens *)
+(* p_ws : unit p  *)
+fun p_ws ts = (eat L.Newline ?? p_ws) #1 ts
+
+(* Separators: either whitespace or a Diamond *)
+(* p_sep : unit p *)
+val p_sep = p_commentsOrWhitespace || eat L.Diamond
 
 (* is_symb : Lexer.token -> bool *)
 fun is_symb t =
@@ -116,7 +124,7 @@ fun p_symb nil = NO (Region.botloc,fn()=>"reached end-of-file")
 
 (* Grammar:
 
-   SEP := DIAMOND | NEWLINE
+   SEP := DIAMOND | NEWLINE | COMMENT
 
    body ::= guard <SEP body>
           | SEP body
@@ -153,7 +161,7 @@ fun unres (UnresE (es1,r1), UnresE (es2,r2)) = UnresE(es1@es2,Region.plus "unres
 
 (* exp parsers *)
 fun p_body ts =
-    (((((p_guard ?? (p_sep ->> p_body)) seq) ?? p_ws) #1)
+    (((((p_guard ?? (p_sep ->> p_body)) seq) ?? p_commentsOrWhitespace) #1)
      || (p_sep ->> p_body)) ts
 
 and p_guard ts =
@@ -254,6 +262,7 @@ fun classify e : class =
       foldl(fn (NONE, a) => a
              | (SOME e, a) => lub a (classify e)) (classify e0) is
     | UnresE(es,_) => foldl (fn (e,a) => lub a (classify e)) bot es
+    | CommentE s => bot
 
 fun pr_class (x,y) = "Cls(" ^ Int.toString x ^ "," ^ Int.toString y ^ ")"
 
@@ -360,6 +369,7 @@ fun resolve E e =
     | DoubleE _ => (e,emp,valuespec)
     | VecE _ => (e,emp,valuespec)
     | StrE s => (e,emp,valuespec)
+    | CommentE s => (e,emp,valuespec)
     | IdE (id,r) => 
       (case lookup E id of
          SOME s => (e,emp,s)

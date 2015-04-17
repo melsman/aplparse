@@ -32,7 +32,8 @@ a >>- b
     Sequence parsers a and b, discard result of b
 
 (a ?? b) f
-    parse a and maybe continue with b, if both succeeds, combine with f
+    parse a and maybe continue with b, if both succeeds, combine with
+    f, if only the first succeeds, return the result of that as it is.
 
 (a ??? b) f
     same as ??, but giving region information to f

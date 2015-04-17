@@ -24,6 +24,7 @@ structure AplAst = struct
          | GuardE of exp * exp * reg
          | IndexE of exp * exp option list * reg
          | UnresE of exp list * reg
+         | CommentE of token list * reg
                    
   fun pr_id (Var v) = v
     | pr_id (Symb s) = L.pr_token s
@@ -48,6 +49,7 @@ structure AplAst = struct
       | GuardE (e1,e2,_) => "Guard(" ^ pr_exp e1 ^ "," ^ pr_exp e2 ^ ")"
       | IndexE (e,is,_) => "Index(" ^ pr_exp e ^ ",[" ^ pr_indices is ^ "])"
       | UnresE (es,_) => "Unres[" ^ pr_exps es ^ "]"
+      | CommentE (ts,_) => "Comment[" ^ L.pr_tokens ts ^ "]"
                      
   and pr_exps nil = ""
     | pr_exps [e] = pr_exp e
@@ -76,6 +78,7 @@ structure AplAst = struct
       | GuardE (_,_,r) => r
       | IndexE (_,_,r) => r
       | UnresE (_,r) => r
+      | CommentE (_,r) => r
                      
   and reg_exps r nil = r
     | reg_exps r (e::es) = reg_exps (Region.plus "reg_exps" r (reg_exp e)) es

@@ -13,7 +13,7 @@ fun maxLocerr (l1:locerr) l2 =
     if Region.lt (#1 l1) (#1 l2) then l2
     else l1
 
-type 'a p = (token*reg)list -> ('a * reg * (token*reg)list, locerr) either
+type 'a p = (token*reg) list -> ('a * reg * (token*reg) list, locerr) either
 
 infix >>> ->> >>- ?? ??? || oo oor
 fun p1 >>> p2 = fn ts =>

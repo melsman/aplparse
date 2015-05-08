@@ -338,7 +338,7 @@ fun process0 (w,(tokens,state,loc)) =
             | (SymbS(Quad,l0,_), SOME (Letter c)) => (tokens, IdS("Quad$" ^ String.str c,l0,loc), Region.next loc)
             | (SymbS(t,l0,l1), _)                => process'((t,(l0,l1))::tokens, StartS, loc)
             | (IntS(s,l0,l1), _)                 =>
-              (case Int.fromString s of
+              (case Int32.fromString s of
                  SOME _ => process'((Int s,(l0,l1))::tokens, StartS, loc)
                | NONE => lexError loc ("ilformed integer " ^ s))
             | (DoubleS(s,l0,l1), _)              =>

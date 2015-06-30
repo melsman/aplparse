@@ -3,7 +3,9 @@ structure AplAst = struct
   type token = L.token
   type reg = Region.reg
   type var = string
-             
+
+  datatype valence = MONADIC | DYADIC
+
   datatype id = Symb of token
               | Var of var
                        
@@ -24,6 +26,7 @@ structure AplAst = struct
          | GuardE of exp * exp * reg
          | IndexE of exp * exp option list * reg
          | UnresE of exp list * reg
+         | GenericE of (valence -> exp) * reg     (* valence generic parse trees *)
                    
   fun pr_id (Var v) = v
     | pr_id (Symb s) = L.pr_token s
@@ -49,6 +52,7 @@ structure AplAst = struct
       | GuardE (e1,e2,_) => "Guard(" ^ pr_exp e1 ^ "," ^ pr_exp e2 ^ ")"
       | IndexE (e,is,_) => "Index(" ^ pr_exp e ^ "," ^ pr_sqindices is ^ ")"
       | UnresE (es,_) => "Unres[" ^ pr_exps es ^ "]"
+      | GenericE (f,_) => "Generic[MONADIC=" ^ pr_exp (f MONADIC) ^ ", DYADIC=" ^ pr_exp (f DYADIC) ^ "]"
                      
   and pr_sqindices is = "[" ^ pr_indices is ^ "]"
 
@@ -79,6 +83,7 @@ structure AplAst = struct
       | GuardE (_,_,r) => r
       | IndexE (_,_,r) => r
       | UnresE (_,r) => r
+      | GenericE (_,r) => r
                      
   and reg_exps r nil = r
     | reg_exps r (e::es) = reg_exps (Region.plus "reg_exps" r (reg_exp e)) es

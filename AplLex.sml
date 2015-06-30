@@ -17,6 +17,8 @@ datatype token =
        | Omegaomega
        | Iota
        | Rho
+       | Rtack
+       | Ltack
        | Quad
        | Quaddiv
        | Quotquad
@@ -99,6 +101,8 @@ fun pr_token t =
        | Omegaomega => "Omegaomega"
        | Iota => "Iota"
        | Rho => "Rho"
+       | Rtack => "Rtack"
+       | Ltack => "Ltack"
        | Quad => "Quad"
        | Quaddiv => "Quaddiv"
        | Quotquad => "Quotquad"
@@ -214,6 +218,8 @@ fun lexWord w =
       | 0wx2375 => SOME Omega
       | 0wx2374 => SOME Rho
       | 0wx2363 => SOME StarDia
+      | 0wx22A2 => SOME Rtack
+      | 0wx22A3 => SOME Ltack
       | 0wx22C6 => SOME Pow
       | 0wx2368 => SOME TildeDia
       | 0wxAF => SOME Macron

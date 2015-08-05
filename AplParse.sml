@@ -9,32 +9,34 @@ open AplAst
 structure PComb = ParseComb(type token=token 
                             val pr_token = AplLex.pr_token)
 
+type reg = Region.reg
+
 open PComb infix >>> ->> >>- ?? ??? || oo oor
 
 (* p_id : string p *)
 fun p_id nil = NO (Region.botloc,fn () => "expecting identifier but found end-of-file")
   | p_id ((L.Id id,r)::ts) = OK(id,r,ts)
-  | p_id ((t,r)::_) = NO (#1 r,fn() => ("expecting identifier but found token " ^ AplLex.pr_token t))
+  | p_id ((t,r:reg)::_) = NO (#1 r,fn() => ("expecting identifier but found token " ^ AplLex.pr_token t))
 
 (* p_quad : string p *)
 fun p_quad nil = NO (Region.botloc,fn () => "expecting Quad or identifier but found end-of-file")
   | p_quad ((L.Quad,r)::ts) = OK("$Quad",r,ts)
-  | p_quad ((t,r)::_) = NO (#1 r,fn() => ("expecting Quad or identifier but found token " ^ AplLex.pr_token t))
+  | p_quad ((t,r:reg)::_) = NO (#1 r,fn() => ("expecting Quad or identifier but found token " ^ AplLex.pr_token t))
 
 (* p_double : double p *)
 fun p_double nil = NO (Region.botloc,fn () => "expecting double but found end-of-file")
   | p_double ((L.Double d,r)::ts) = OK(d,r,ts)
-  | p_double ((t,r)::_) = NO (#1 r, fn() => ("expecting double but found token " ^ AplLex.pr_token t))
+  | p_double ((t,r:reg)::_) = NO (#1 r, fn() => ("expecting double but found token " ^ AplLex.pr_token t))
 
 (* p_int : int p *)
 fun p_int nil = NO (Region.botloc,fn () => "expecting integer but found end-of-file")
   | p_int ((L.Int i,r)::ts) = OK(i,r,ts)
-  | p_int ((t,r)::_) = NO (#1 r, fn() => ("expecting integer but found token " ^ AplLex.pr_token t))
+  | p_int ((t,r:reg)::_) = NO (#1 r, fn() => ("expecting integer but found token " ^ AplLex.pr_token t))
 
 (* p_string : word list p *)
 fun p_string nil = NO (Region.botloc,fn () => "expecting string but found end-of-file")
   | p_string ((L.Chars ws,r)::ts) = OK(ws,r,ts)
-  | p_string ((t,r)::_) = NO (#1 r, fn() => ("expecting string but found token " ^ AplLex.pr_token t))
+  | p_string ((t,r:reg)::_) = NO (#1 r, fn() => ("expecting string but found token " ^ AplLex.pr_token t))
 
 (* p_comment : token list p *)
 fun p_comment nil = NO (Region.botloc,fn () => "expecting comment but found end-of-file")
@@ -111,7 +113,7 @@ fun is_symb t =
 
 (* p_symb : token p *)
 fun p_symb nil = NO (Region.botloc,fn()=>"reached end-of-file")
-  | p_symb ((t,r)::ts) = 
+  | p_symb ((t,r:reg)::ts) = 
     if is_symb t then OK(t,r,ts) 
     else NO (#1 r,
              fn () => ("expecting symbol but found token " ^ 

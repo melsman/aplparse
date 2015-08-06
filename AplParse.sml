@@ -10,6 +10,7 @@ structure PComb = ParseComb(type token=token
                             val pr_token = AplLex.pr_token)
 
 type reg = Region.reg
+val botreg = (Region.botloc,Region.botloc)
 
 open PComb infix >>> ->> >>- ?? ??? || oo oor
 
@@ -59,6 +60,8 @@ fun is_symb t =
     | L.Omega => true
     | L.Omegaomega => true
     | L.Rho => true
+    | L.Rtack => true
+    | L.Ltack => true
     | L.Iota => true
     | L.Max => true
     | L.Min => true
@@ -163,12 +166,12 @@ fun unres (UnresE (es1,r1), UnresE (es2,r2)) = UnresE(es1@es2,Region.plus "unres
 
 (* exp parsers *)
 fun p_body ts =
-    ((p_guard ?? p_sepbody) seq
+    (((((p_guard ?? p_sepbody) seq) ?? p_ws) #1)
      || p_sepbody) ts
 
 and p_sepbody ts =
-     ((((p_comment ?? p_body) seq
-     || (p_sep ->> p_body)) ?? p_ws) #1) ts
+     (  (p_comment ?? p_body) seq
+     || (p_sep ->> p_body)) ts
 
 and p_guard ts =
     (p_expr ??? (eat L.Colon ->> p_expr)) GuardE ts
@@ -268,6 +271,7 @@ fun classify e : class =
       foldl(fn (NONE, a) => a
              | (SOME e, a) => lub a (classify e)) (classify e0) is
     | UnresE(es,_) => foldl (fn (e,a) => lub a (classify e)) bot es
+    | GenericE _ => raise Fail "classify:Generic"
     | CommentE s => bot
 
 fun pr_class (x,y) = "Cls(" ^ Int.toString x ^ "," ^ Int.toString y ^ ")"
@@ -337,13 +341,13 @@ fun isFunKind p E id =
     case List.find (fn (id',_) => id = id') E of
       SOME (_,s) => isKind p s
     | NONE => false
-fun isVal s = isKind Class.pVal s
-fun isFun1 s = isKind Class.pFun1 s
-fun isFun2 s = isKind Class.pFun2 s
-fun isOpr1 s = isKind Class.pOpr1 s
-fun isOpr2 s = isKind Class.pOpr2 s
-fun isOpr s = isOpr1 s orelse isOpr2 s
-fun isFun s = isFun1 s orelse isFun2 s
+fun isVal (_,s) = isKind Class.pVal s
+fun isFun1 (_,s) = isKind Class.pFun1 s
+fun isFun2 (_,s) = isKind Class.pFun2 s
+fun isOpr1 (_,s) = isKind Class.pOpr1 s
+fun isOpr2 (_,s) = isKind Class.pOpr2 s
+fun isOpr g = isOpr1 g orelse isOpr2 g
+fun isFun g = isFun1 g orelse isFun2 g
 fun appopr s = List.map Class.appopr s
 val valuespec = [Class.value]
 val lamb_env =
@@ -354,6 +358,10 @@ val lamb_env =
         (Symb Alphaalpha, [value,fun1,fun2]),
         (Symb Omegaomega, [value,fun1,fun2])]
     end
+fun pr_g (e,_) = pr_exp e
+fun reg_g (e,_) = reg_exp e
+val alpha_g = (IdE(Symb L.Alpha,botreg), valuespec)
+val omega_g = (IdE(Symb L.Omega,botreg), valuespec)
 
 (* Here is an example resolution:
 
@@ -437,77 +445,152 @@ fun resolve E e =
           val (e,s) = res0 r (rev gs)
       in (e,E',s)
       end
-and appOpr1((e1,s1),e2) =
+    | GenericE _ => raise Fail "resolve:Generic"
+
+and appOpr1((e1,s1),(e2,_)) =
     let val derivedfunvalences = List.map #2 (appopr s1)
         val r = Region.plus "appOpr1" (reg_exp e2) (reg_exp e1)
     in (AppOpr1E(derivedfunvalences,e1,e2,r),appopr s1)
     end
-and appOpr2((e1,s1),e2,e3) =
+and appOpr2((e1,s1),(e2,_),(e3,_)) =
     let val derivedfunvalences = List.map #2 (appopr s1)
         val r = Region.plus "appOpr2" (reg_exp e2) (reg_exp e3)
     in (AppOpr2E(derivedfunvalences,e1,e2,e3,r),appopr s1)
     end
-and app1(e1,e2) =
+and app1((e1,_),(e2,_)) =
     let val r = Region.plus "app1" (reg_exp e1) (reg_exp e2)
     in (App1E(e1,e2,r),valuespec)
     end
-and app2(e1,e2,e3) =
-    let val r = Region.plus "app2" (reg_exp e2) (reg_exp e3)
+and app2((e1,_),(e2,_),(e3,_)) =
+    let val r1 = reg_exp e1
+        val r2 = reg_exp e2
+        val r3 = reg_exp e3
+        val r = if r2 = botreg then
+                  if r3 = botreg then r1
+                  else Region.plus "app2.1" r1 r3
+                else if r3 = botreg then Region.plus "app2.2" r2 r1
+                else Region.plus "app2" r2 r3
     in (App2E(e1,e2,e3,r),valuespec)
     end
 and res0 r gs =
     case gs of
       [] => raise Fail "res0: empty Unres node"
     | [g] => g
-    | [(e1,s1),(e2,s2)] =>
-      if isFun1 s2 andalso isVal s1 then
-        res0 r [app1(e2,e1)]
-      else if isOpr1 s1 andalso isFun s2 then
-        res0 r [appOpr1((e1,s1),e2)]
-      else resolveErr (Region.plus "res0.1" (reg_exp e2) (reg_exp e1)) "could not resolve Unres node"
-    | (e1,s1)::(e2,s2)::(e3,s3)::gs =>   
+    | [g1,g2] =>
+      (case resFun gs of
+           SOME [g] => g
+         | SOME [g1,g2] => if isFun g2 then
+                             let val r = Region.plus "atop" (reg_g g2) (reg_g g1)
+                                 fun lam c g = (LambE(c,#1(app1(g2,g)),r), [c])
+                                 val g_m = if isFun1 g1 then SOME(lam Class.fun1 (app1(g1,omega_g)))
+                                           else NONE
+                                 val g_d = if isFun2 g1 then SOME(lam Class.fun2 (app2(g1,alpha_g,omega_g)))
+                                           else NONE
+                             in case (g_m, g_d) of
+                                    (SOME (e_m,s_m), SOME (e_d,s_d)) => (GenericE(fn MONADIC => e_m | DYADIC => e_d, r), s_m @ s_d)
+                                  | (SOME g,NONE) => g
+                                  | (NONE, SOME g) => g
+                                  | (NONE, NONE) => resolveErr r "res0.impossible - g1 should be a function"
+                             end
+                           else resolveErr (reg_g g2) "expecting a function"
+         | SOME _ => resolveErr r "res0.impossible"
+         | NONE => if isFun1 g2 andalso isVal g1 then res0 r [app1(g2,g1)]
+                   (*else if isOpr1 g1 andalso isFun g2 then res0 r [appOpr1(g1,g2)]*)
+                   else resolveErr (Region.plus "res0.1" (reg_g g2) (reg_g g1)) "could not resolve Unres node")
+    | g1::g2::g3::gs =>   
       let fun cont() =
-              if isFun1 s2 then res0 r (app1(e2,e1)::(e3,s3)::gs)   (* ... b f1 a ==> ... b f1(a) *)
-              else if isOpr1 s2 then
-                case resFun ((e3,s3)::gs) of
-                  SOME ((e3,s3)::gs) => res0 r ((e1,s1)::appOpr1((e2,s2),e3)::gs)
+              if isFun1 g2 then res0 r (app1(g2,g1)::g3::gs)   (* ... b f1 a ==> ... b f1(a) *)
+              else if isOpr1 g2 then
+                case resFun (g3::gs) of
+                  SOME (g3::gs) => res0 r (g1::appOpr1(g2,g3)::gs)
                 | SOME nil => raise Fail "res0: impossible"
-                | NONE => res0 r ((e1,s1)::appOpr1((e2,s2),e3)::gs) (* pass value as argument to monadic operator! *)
+                | NONE => res0 r (g1::appOpr1(g2,g3)::gs) (* pass value as argument to monadic operator! *)
               else
-                resolveErr (Region.plus "res0.2" (reg_exp e3) (reg_exp e1))
-                           ("dyadic operator not yet supported for e2: " ^ pr_exp e2 ^ "; e1: " ^ pr_exp e1)
-      in if isOpr2 s3 then                                     (* ... o2 f a *)
-           case resFun gs of
-               SOME((e4,s4)::gs) => res0 r ((e1,s1)::appOpr2((e3,s3),e4,e2)::gs)
-             | _ => case gs of
-                        (e4,s4)::gs => res0 r ((e1,s1)::appOpr2((e3,s3),e4,e2)::gs)
-                      | nil => raise Fail "res0: expecting argument to dyadic operator"
+                resolveErr (Region.plus "res0.2" (reg_g g3) (reg_g g1))
+                           ("dyadic operator not yet supported for e2: " ^ pr_g g2 ^ "; e1: " ^ pr_g g1)
+      in case resFun (g1::g2::g3::gs) of
+             SOME (g1::g2::g3::gs) => (* it is a train *)
+             (case resFun (g2::g3::gs) of
+                  SOME nil => resolveErr (reg_g g3) "train.impossible1"
+                | SOME [_] => resolveErr (reg_g g3) "train.impossible2"
+                | SOME (g2::g3::gs) =>
+                  if isFun2 g2 then
+                    case try3Train g1 g2 g3 gs of
+                        (SOME (e_m,s_m), SOME (e_d,s_d), r) => (GenericE(fn MONADIC => e_m | DYADIC => e_d, r), s_m @ s_d)
+                      | (NONE, SOME g_d, _) => g_d
+                      | (SOME g_m, NONE, _) => g_m
+                      | (NONE, NONE, r) => resolveErr r ("expecting f and h in an fgh-train both to be either monadic or dyadic; got " ^ pr_g g3 ^ " and " ^ pr_g g1)
+                  else resolveErr (reg_g g2) ("expecting dyadic function in train but got: " ^ pr_g g2)
+                | NONE => resolveErr (reg_g g2) ("expecting function in train but got: " ^ pr_g g2))
+          | _ =>  (* it is not a train *) 
+            if isOpr2 g3 then                                     (* ... o2 f a *)
+              case resFun gs of
+                  SOME(g4::gs) => res0 r (g1::appOpr2(g3,g4,g2)::gs)
+                | _ => case gs of
+                           g4::gs => res0 r (g1::appOpr2(g3,g4,g2)::gs)
+                         | nil => raise Fail "res0: expecting argument to dyadic operator"
 (*
-         else if isOpr1 s3 then
-           res0 r ((e1,s1)::appOpr1((e3,s3),e2)::gs)
+            else if isOpr1 s3 then
+              res0 r ((e1,s1)::appOpr1((e3,s3),e2)::gs)
 *)
-         else if isFun2 s2 andalso isVal s1 andalso isVal s3 then
-           res0 r (app2(e2,e3,e1)::gs)        (* ... b f2 a ==> ... f2(a,b) *)
-         else if isOpr2 s2 then
-           if not(isOpr s1) andalso not(isOpr s3) then
-             res0 r (appOpr2((e2,s2),e3,e1)::gs)
-           else
-             raise Fail "res0: operators cannot take operators as arguments"
-         else cont()
+            else if isFun2 g2 andalso isVal g1 andalso isVal g3 then
+              res0 r (app2(g2,g3,g1)::gs)        (* ... b f2 a ==> ... f2(a,b) *)
+            else if isOpr2 g2 then
+              if not(isOpr g1) andalso not(isOpr g3) then
+                res0 r (appOpr2(g2,g3,g1)::gs)
+              else
+                raise Fail "res0: operators cannot take operators as arguments"
+            else cont()
       end
+and trainWrap f c r gs =
+    let val g = (LambE(c,#1(f()),r), [c])
+    in SOME(res0 r (g::gs))
+    end handle _ => NONE
+and try3Train g1 g2 g3 gs =
+    let val r21 = Region.plus "train2" (reg_g g2) (reg_g g1)
+    in case resFun (g3::gs) of
+           SOME nil => resolveErr (reg_g g3) "try3Train.impossible"
+         | SOME (g3::gs) =>
+           let val r = Region.plus "train1" (reg_g g3) r21
+               val g_m = if isFun1 g1 andalso isFun1 g3 then (* monadic fgh-train *)
+                           trainWrap (fn () => app2(g2,app1(g3,omega_g),app1(g1,omega_g))) Class.fun1 r gs
+                         else NONE
+               val g_d = if isFun2 g1 andalso isFun2 g3 then (* dyadic fgh-train *)
+                           trainWrap (fn () => app2(g2,app2(g3,alpha_g,omega_g),app2(g1,alpha_g,omega_g))) Class.fun2 r gs
+                         else NONE
+           in (g_m, g_d, r)
+           end
+         | NONE => 
+           let val r = Region.plus "train1" (reg_g g3) r21
+               val g_m = if isFun1 g1 andalso isVal g3 then (* monadic Agh-train *)
+                           trainWrap (fn () => app2(g2,g3,app1(g1,omega_g))) Class.fun1 r gs
+                         else NONE
+               val g_d = if isFun2 g1 andalso isVal g3 then (* dyadic Agh-train *)
+                           trainWrap (fn () => app2(g2,g3,app2(g1,alpha_g,omega_g))) Class.fun2 r gs
+                         else NONE
+           in (g_m, g_d, r)
+           end
+    end
 and resFun gs =
     case gs of
       [] => raise Fail "resFun: impossible"
-    | [(e1,s1)] => if isFun s1 then SOME gs else NONE
-    | (e1,s1)::(e2,s2) :: gs' =>
-      if isOpr2 s2 then
-        raise Fail "resFun: dyadic operators not yet supported"
-      else if isFun s1 then SOME gs 
-      else if isOpr1 s1 then
-        (case resFun ((e2,s2)::gs') of
-           SOME((e2,s2)::gs') => SOME(appOpr1((e1,s1),e2)::gs')
+    | [g1] => if isFun g1 then SOME gs else NONE
+    | g1::g2::gs' =>
+      if isOpr2 g2 then NONE
+                            (*raise Fail "resFun: dyadic operators not yet supported"*)
+      else if isFun g1 then SOME gs 
+      else if isOpr1 g1 then
+        (case resFun (g2::gs') of
+           SOME(g2::gs') => SOME(appOpr1(g1,g2)::gs')
          | SOME nil => raise Fail "resFun: impossible"
-         | NONE => NONE)
+         | NONE => if isVal g2 then (* convert g1 to a fun2 function *) 
+                     let val c = Class.fun2
+                         val r = reg_g g1
+                         val g = app2(g1,alpha_g,omega_g)
+                         val g1' = (LambE(c,#1 g,r), [c])
+                     in SOME (g1'::g2::gs')
+                     end
+                   else NONE)
       else NONE
 
 val env0 =
@@ -516,6 +599,8 @@ val env0 =
     in List.map (fn (t,l) => (Symb t,l))
        [(Zilde,     valuespec),
         (Rho,       [fun1,fun2]),
+        (Rtack,     [fun1,fun2]),
+        (Ltack,     [fun2]),
         (Max,       [fun1,fun2]),
         (Min,       [fun1,fun2]),
         (Iota,      [fun1]),
@@ -553,7 +638,7 @@ val env0 =
         (Nor,       [fun2]),
         (Nand,      [fun2]),
         (Match,     [fun2]),
-        (Nmatch,    [fun2]),
+        (Nmatch,    [fun1,fun2]),
         (Intersect, [fun2]),
         (Union,     [fun2]),
         (Ring,      [fun1,fun2]),     (* hack to resolve Ring Dot (outer product) as an application of a dyadic operator *)

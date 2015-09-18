@@ -78,13 +78,18 @@ datatype token =
        | Thorn
        | EOF
 
+exception UnrecognizedSymbol of word
+
+fun word2char w = Char.chr (Word.toInt w) handle Chr => (print (Word.toString w); raise UnrecognizedSymbol w)
+
 (* pr_chars : word list -> string *)
 fun pr_chars ws =
     if List.all (fn w => w < 0w128) ws then
-      "'" ^ implode (List.map (Char.chr o Word.toInt) ws) ^ "'"
+      "'" ^ implode (List.map word2char ws) ^ "'"
     else "Chars(" ^ String.concatWith "," (List.map Word.toString ws) ^ ")"
 
-val ppw = String.str o Char.chr o Word.toInt
+
+val ppw = String.str o word2char
 
 (* pp_token : token -> string *)
 fun pp_token t =
@@ -170,7 +175,7 @@ fun pp_token t =
        | Tilde => "~"
        | Intersect => ppw 0wx2229
        | Union => ppw 0wx222A
-       | Lamp => ppw 0wx235D
+       | Lamp => "<Lamp>" (* ppw 0wx235D *)
        | Comment ts => pp_token Lamp ^ pp_tokens ts
        | Newline => "\n"
        | Letter c => String.str c

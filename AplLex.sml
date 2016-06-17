@@ -67,6 +67,7 @@ datatype token =
        | Id of string
        | Int of string
        | Double of string
+       | Complex of string
        | Chars of word list
        | Dollar
        | Underscore
@@ -76,6 +77,19 @@ datatype token =
        | Fac
        | Thorn
 
+fun complexFromString s =
+    let fun fixDot s =
+            case explode s of
+                #"." :: rest => implode (#"0" :: #"." :: rest)
+             |  #"-":: #"." :: rest => implode (#"-" :: #"0" :: #"." :: rest)
+             | _ => s
+    in case String.tokens (fn c => c = #"j") s of
+           [r,i] => (case (Real.fromString r, Real.fromString i) of
+                         (SOME r, SOME i) => SOME(r,i)
+                       | _ => NONE)
+         | _ => NONE
+    end
+             
 (* pr_chars : word list -> string *)
 fun pr_chars ws =
     if List.all (fn w => w < 0w128) ws then
@@ -173,6 +187,7 @@ fun pr_token t =
        | Id s => "Id(" ^ s ^ ")"
        | Int i => i
        | Double r => r
+       | Complex c => c
        | Chars ws => pr_chars ws
        | Dollar => "Dollar"
        | Underscore => "Underscore"
@@ -192,6 +207,9 @@ datatype state = CommentS
                | SymbS of token * loc * loc   (* for lexing Alphaalpha, Omegaomega, Quad-Id *)
                | IntS of string * loc * loc
                | DoubleS of string * loc * loc
+               | ComplexJS of string * loc * loc
+               | ComplexIS of string * loc * loc
+               | ComplexS of string * loc * loc
                | CharsS of word list * loc * loc
                | IdS of string * loc * loc
 
@@ -316,6 +334,9 @@ fun lexError loc s =
 
 type procstate = (token * reg) list * state * loc
 
+fun last "" = NONE
+  | last s = SOME(String.sub(s,size s - 1))
+                                                  
 (* process : word * procstate -> procstate *)
 fun process0 (w,(tokens,state,loc)) =
     let val elem = lexWord w
@@ -327,9 +348,18 @@ fun process0 (w,(tokens,state,loc)) =
             | (StartS,        SOME (Digit c))    => (tokens, IntS(String.str c,loc,loc), Region.next loc)
             | (IntS(s,l0,_),  SOME (Digit c))    => (tokens, IntS(s ^ String.str c,l0,loc), Region.next loc)
             | (DoubleS(s,l0,_), SOME (Digit c))  => (tokens, DoubleS(s ^ String.str c,l0,loc), Region.next loc)
-            | (IntS(s,l0,_),  SOME (Letter c))   => lexError loc "ilformed integer"
-            | (DoubleS(s,l0,_), SOME (Letter c)) => lexError loc "ilformed double"
-            | (IntS(s,l0,_),  SOME Dot)          => (tokens, DoubleS(s ^ ".",l0,loc), Region.next loc)
+            | (IntS(s,l0,_),  SOME (Letter c))   => if c = #"j" orelse c = #"J" then (tokens,ComplexJS(s ^ "j",l0,loc),Region.next loc)
+                                                    else lexError loc "ilformed integer"
+            | (DoubleS(s,l0,_), SOME (Letter c)) => if c = #"j" orelse c = #"J" then (tokens,ComplexJS(s ^ "j",l0,loc),Region.next loc)
+                                                    else lexError loc "ilformed double"
+            | (ComplexJS(s,l0,_), SOME Macron)   => (tokens, ComplexIS(s ^ "-",l0,loc), Region.next loc) 
+            | (ComplexJS(s,l0,_), SOME (Digit c))=> (tokens, ComplexIS(s ^ String.str c,l0,loc), Region.next loc) 
+            | (ComplexJS(s,l0,_), SOME Dot)      => (tokens, ComplexS(s ^ "0.",l0,loc), Region.next loc) 
+            | (ComplexIS(s,l0,_),SOME (Digit c)) => (tokens, ComplexIS(s ^ String.str c,l0,loc), Region.next loc) 
+            | (ComplexIS(s,l0,_), SOME Dot)      => (tokens, ComplexS(if last s = SOME #"-" then s ^ "0." else s ^ ".",l0,loc), Region.next loc) 
+            | (ComplexS(s,l0,_), SOME (Digit c)) => (tokens, ComplexS(s ^ String.str c,l0,loc), Region.next loc) 
+            | (StartS,        SOME Dot)          => (tokens, SymbS(Dot,loc,loc), Region.next loc)
+            | (IntS(s,l0,_),  SOME Dot)          => (tokens, DoubleS(if s = "-" then "-0." else s ^ ".",l0,loc), Region.next loc)
             | (StartS,        SOME (Letter c))   => (tokens, IdS(String.str c,loc,loc), Region.next loc)
             | (StartS,        SOME Dollar)       => (tokens, IdS("$",loc,loc), Region.next loc)
             | (StartS,        SOME Underscore)   => (tokens, IdS("_",loc,loc), Region.next loc)
@@ -341,7 +371,8 @@ fun process0 (w,(tokens,state,loc)) =
             | (StartS,        SOME Quad)         => (tokens, SymbS(Quad,loc,loc), Region.next loc)
             | (SymbS(Alpha,l0,_), SOME Alpha)    => ((Alphaalpha,(l0,loc))::tokens, StartS, Region.next loc)
             | (SymbS(Omega,l0,_), SOME Omega)    => ((Omegaomega,(l0,loc))::tokens, StartS, Region.next loc)
-            | (SymbS(Quad,l0,_), SOME (Letter c)) => (tokens, IdS("Quad$" ^ String.str c,l0,loc), Region.next loc)
+            | (SymbS(Quad,l0,_), SOME (Letter c))=> (tokens, IdS("Quad$" ^ String.str c,l0,loc), Region.next loc)
+            | (SymbS(Dot,l0,_), SOME (Digit c))  => (tokens, DoubleS("0." ^ String.str c,l0,loc), Region.next loc)
             | (SymbS(t,l0,l1), _)                => process'((t,(l0,l1))::tokens, StartS, loc)
             | (IntS(s,l0,l1), _)                 =>
               (case Int32.fromString s of
@@ -351,6 +382,18 @@ fun process0 (w,(tokens,state,loc)) =
               (case Real.fromString s of
                  SOME _ => process'((Double s,(l0,l1)) :: tokens, StartS, loc)
                | NONE => lexError loc ("ilformed double " ^ s))
+            | (ComplexIS(s,l0,l1), _)              =>
+              (case complexFromString s of
+                 SOME _ => process'((Complex s,(l0,l1)) :: tokens, StartS, loc)
+               | NONE => lexError loc ("ilformed complex number " ^ s))
+            | (ComplexS(s,l0,l1), _)               =>
+              (case complexFromString s of
+                 SOME _ => process'((Complex s,(l0,l1)) :: tokens, StartS, loc)
+               | NONE => lexError loc ("non-wellformed complex number " ^ s))
+            | (ComplexJS(s,l0,l1), _)            =>
+              (case complexFromString (s ^ "0") of
+                 SOME _ => process'((Complex s,(l0,l1)) :: tokens, StartS, loc)
+               | NONE => lexError loc ("malformed complex number " ^ s))
             | (IdS(s,l0,l1),  _)                 => process'((Id s,(l0,l1))::tokens, StartS, loc)
             | (StartS,        SOME Comment)      => (tokens,CommentS, Region.next loc)
             | (StartS,        SOME Quot)         => (tokens,CharsS(nil,loc,loc), Region.next loc)

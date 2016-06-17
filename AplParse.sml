@@ -37,6 +37,11 @@ fun p_double nil = NO (Region.botloc,fn () => "expecting double but found end-of
   | p_double ((L.Double d,r)::ts) = OK(d,r,ts)
   | p_double ((t,r:reg)::_) = NO (#1 r, fn() => ("expecting double but found token " ^ AplLex.pr_token t))
 
+(* p_complex : complex p *)
+fun p_complex nil = NO (Region.botloc,fn () => "expecting complex number but found end-of-file")
+  | p_complex ((L.Complex d,r)::ts) = OK(d,r,ts)
+  | p_complex ((t,r:reg)::_) = NO (#1 r, fn() => ("expecting complex number but found token " ^ AplLex.pr_token t))
+                                 
 (* p_int : int p *)
 fun p_int nil = NO (Region.botloc,fn () => "expecting integer but found end-of-file")
   | p_int ((L.Int i,r)::ts) = OK(i,r,ts)
@@ -190,6 +195,7 @@ and p_indices ts =
 and p_indexable ts =
     (  (p_int oor IntE)
     || (p_double oor DoubleE)
+    || (p_complex oor ComplexE)
     || (p_string oor StrE)
     || (p_symb oor (fn (a,r) => IdE(Symb a,r)))
     || (p_id oor (fn (a,r) => IdE(Var a,r)))
@@ -237,6 +243,7 @@ fun classify e : class =
     case e of
       IntE s => bot
     | DoubleE s => bot
+    | ComplexE s => bot
     | VecE _ => bot
     | StrE s => bot
     | IdE(Symb L.Omega,_) => omega
@@ -368,6 +375,7 @@ fun resolve E e =
     case e of
       IntE _ => (e,emp,valuespec)
     | DoubleE _ => (e,emp,valuespec)
+    | ComplexE _ => (e,emp,valuespec)
     | VecE _ => (e,emp,valuespec)
     | StrE s => (e,emp,valuespec)
     | IdE (id,r) => 
@@ -516,16 +524,19 @@ and res0 r gs =
                            g4::gs => res0 r (g1::appOpr2(g3,g4,g2)::gs)
                          | nil => raise Fail "res0: expecting argument to dyadic operator"
 (*
-            else if isOpr1 s3 then
-              res0 r ((e1,s1)::appOpr1((e3,s3),e2)::gs)
+            else if isOpr1 g3 andalso List.null gs then
+              res0 r (g1::appOpr1(g3,g2)::gs)
 *)
             else if isFun2 g2 andalso isVal g1 andalso isVal g3 then
               res0 r (app2(g2,g3,g1)::gs)        (* ... b f2 a ==> ... f2(a,b) *)
             else if isOpr2 g2 then
-              if not(isOpr g1) andalso not(isOpr g3) then
-                res0 r (appOpr2(g2,g3,g1)::gs)
-              else
-                raise Fail "res0: operators cannot take operators as arguments"
+              if not(isOpr g1) then
+                case resFun (g3::gs) of
+                    SOME (g3::gs) => res0 r (appOpr2(g2,g3,g1)::gs)
+                  | SOME nil => raise Fail "res0: impossible2"
+                  | NONE => if isVal g3 then res0 r (appOpr2(g2,g3,g1)::gs)
+                            else resolveErr (reg_g g3) ("expecting value or function as left argument to dyadic operator - got " ^ pr_g g3)
+              else resolveErr (reg_g g1) ("operators cannot take operators as arguments - got " ^ pr_g g1)
             else cont()
       end
 and trainWrap f c r gs =
@@ -541,7 +552,7 @@ and try3Train g1 g2 g3 gs =
                val g_m = if isFun1 g1 andalso isFun1 g3 then (* monadic fgh-train *)
                            trainWrap (fn () => app2(g2,app1(g3,omega_g),app1(g1,omega_g))) Class.fun1 r gs
                          else NONE
-               val g_d = if isFun2 g1 andalso isFun2 g3 then (* dyadic fgh-train *)
+               val g_d = if isFun2 g1 andalso isFun2 g3 then 
                            trainWrap (fn () => app2(g2,app2(g3,alpha_g,omega_g),app2(g1,alpha_g,omega_g))) Class.fun2 r gs
                          else NONE
            in (g_m, g_d, r)
@@ -553,6 +564,8 @@ and try3Train g1 g2 g3 gs =
                          else NONE
                val g_d = if isFun2 g1 andalso isVal g3 then (* dyadic Agh-train *)
                            trainWrap (fn () => app2(g2,g3,app2(g1,alpha_g,omega_g))) Class.fun2 r gs
+                         else if isFun2 g1 andalso List.null gs andalso isOpr1 g3 then (* dyadic fgh-train with / to the left, e.g. *)
+                           trainWrap (fn () => app2(g2,app1(appOpr1(g3,alpha_g),omega_g),app2(g1,alpha_g,omega_g))) Class.fun2 r gs
                          else NONE
            in (g_m, g_d, r)
            end
@@ -560,10 +573,11 @@ and try3Train g1 g2 g3 gs =
 and resFun gs =
     case gs of
       [] => raise Fail "resFun: impossible"
-    | [g1] => if isFun g1 then SOME gs else NONE
+    | [g] => if isFun g then SOME gs else
+             if isOpr1 g then SOME [(LambE(Class.fun2,#1(app1(appOpr1(g,alpha_g),omega_g)),reg_g g), [Class.fun2])] else 
+             NONE
     | g1::g2::gs' =>
-      if isOpr2 g2 then NONE
-                            (*raise Fail "resFun: dyadic operators not yet supported"*)
+      if isOpr2 g2 then NONE  (*raise Fail "resFun: dyadic operators not yet supported"*)
       else if isFun g1 then SOME gs 
       else if isOpr1 g1 then
         (case resFun (g2::gs') of
@@ -572,7 +586,7 @@ and resFun gs =
          | NONE => if isVal g2 then (* convert g1 to a fun2 function *) 
                      let val c = Class.fun2
                          val r = reg_g g1
-                         val g = app2(g1,alpha_g,omega_g)
+                         val g = app1(appOpr1(g1,alpha_g),omega_g)
                          val g1' = (LambE(c,#1 g,r), [c])
                      in SOME (g1'::g2::gs')
                      end
@@ -591,6 +605,7 @@ val env0 =
         (Min,       [fun1,fun2]),
         (Iota,      [fun1]),
         (Tilde,     [fun1]),
+        (TildeDia,  [opr1fun1,opr1fun2]),
         (Trans,     [fun1,fun2]),
         (Enclose,   [fun1]),
         (Disclose,  [fun1,fun2]),
@@ -627,7 +642,7 @@ val env0 =
         (Nmatch,    [fun1,fun2]),
         (Intersect, [fun2]),
         (Union,     [fun2]),
-        (Ring,      [fun1,fun2]),     (* hack to resolve Ring Dot (outer product) as an application of a dyadic operator *)
+        (Ring,      [fun1,fun2,opr2fun1,opr2fun2]),     (* fun1,fun2: hack to resolve Ring Dot (outer product) as an application of a dyadic operator *)
         (Each,      [opr1fun1,opr1fun2]),
         (StarDia,   [opr2fun1]),
         (Circ,      [fun1,fun2]),

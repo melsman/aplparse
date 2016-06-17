@@ -12,6 +12,7 @@ structure AplAst = struct
   datatype exp =
            IntE of string * reg
          | DoubleE of string * reg
+         | ComplexE of string * reg
          | StrE of word list * reg
          | VecE of exp list * reg
          | IdE of id * reg
@@ -37,6 +38,7 @@ structure AplAst = struct
       case e of
         IntE (s,_) => s
       | DoubleE (s,_) => s
+      | ComplexE (s,_) => s
       | StrE (ws,_) => L.pr_chars ws
       | VecE (es,_) => "Vec[" ^ pr_exps es ^ "]"
       | IdE (id,_) => pr_id id
@@ -69,6 +71,7 @@ structure AplAst = struct
       case e of
         IntE (_,r) => r
       | DoubleE (_,r) => r
+      | ComplexE (_,r) => r
       | StrE (_,r) => r
       | VecE (_,r) => r
       | IdE (_,r) => r

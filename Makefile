@@ -11,7 +11,7 @@ test: $(FILES) test.mlb test.sml Makefile
 TESTFILES=test.apl test1.apl test2.apl test3.apl test4.apl test5.apl \
           sierpinski.apl mult.apl primes.apl prelude.apl quadassign.apl \
           boolean.apl math.apl vec.apl chars.apl circ.apl quadids.apl \
-          idx.apl underscore.apl thorn.apl train.apl trainatop.apl
+          idx.apl underscore.apl thorn.apl train.apl trainatop.apl idx2.apl float.apl complex.apl
 .PHONY: tests
 tests: test Makefile
 	@$(foreach tf,$(TESTFILES), echo "\n[Processing $(tf)]"; ./test tests/$(tf);)
